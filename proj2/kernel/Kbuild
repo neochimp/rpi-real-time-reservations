@@ -1,0 +1,2 @@
+#Adding sys_calc
+obj-y += sys_calc.o
