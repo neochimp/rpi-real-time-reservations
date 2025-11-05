@@ -1,0 +1,10 @@
+Q1. What is the difference between concurrent execution and parallel execution?
+
+
+Q2. In 4.4, let's supose that a task has exceeded its budget (execution time of C per T). Explain the task's behavior afterwards.
+
+
+Q3. If a deadline of a periodic task is different with its period, how do you implement to support real-time
+
+
+Q4. What issues have you faced for the project and how did you resolve them? (If there isn't any issue, please briefly describe how did you get to the solution.)
