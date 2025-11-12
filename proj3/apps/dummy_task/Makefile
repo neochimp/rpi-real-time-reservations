@@ -4,7 +4,7 @@ SRCS := dummy_task.c
 OBJS := $(SRCS:.c=.o)
 
 CC ?= cc
-CFLAGS ?= -O2 -Wall -Wextra -std=c11
+CFLAGS ?= -O2 -Wall -Wextra -std=c23
 LDFLAGS ?=
 LDLIBS ?=
 
