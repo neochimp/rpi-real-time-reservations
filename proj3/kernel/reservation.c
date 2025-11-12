@@ -3,6 +3,9 @@
 #include <linux/uaccess.h>
 #include <linux/sched.h>
 #include <linux/hrtimer.h>
+#include <linux/pid.h>
+#include <linux/ktime.h>
+#include <linux/spinlock.h>
 
 /*
  * Assigns or "reserves" a CPU time budget (C) over a period (T) for a specific task
@@ -12,8 +15,27 @@ SYSCALL_DEFINE3(set_rsv,
                 struct timespec __user *, C, 
                 struct timespec __user *, T)
 {
-	return 0;
-{
+    // struct task_struct current; defined in <linux/sched.h>
+	struct task_struct *target_task;
+    struct pid *kernel_pid;
+    struct timespec C_local, T_local;
+    int ret;
+
+    /*
+     * task_struct *target_task
+     * find target_task's task_struct from pid
+     * if:
+     *     C and T are valid user-space addresses (copy_from_user())
+     *     target task doesn't already have an active reservation
+     *     continue
+     *  else:
+     *      return -1
+     * store C, T into target_tasks's task_struct
+     * initialize kernel mechanisms (timers) to manage the reservation
+     * return 0
+     */
+}
+
 
 /*
  * Removes an existing CPU time reservation from a task
@@ -21,7 +43,17 @@ SYSCALL_DEFINE3(set_rsv,
 SYSCALL_DEFINE1(cancel_rsv, 
                 pid_t, pid)
 {
-	return 0;
+	/*
+     * task_struct *target_task
+     * find target_task's task_struct from pid
+     * if reservation exists:
+     *     tear down timers
+     *     clear the stored C and T values
+     *     free any allocated resources
+     *     return 0
+     * else:
+     *     return -1
+     */
 }
 
 /*
@@ -29,5 +61,13 @@ SYSCALL_DEFINE1(cancel_rsv,
  */
 SYSCALL_DEFINE0(wait_until_next_period) 
 {
-	return 0;
+	/*
+    * check if current task has an active reservation
+    * if no active reservation:
+    *     return -1
+    * else:
+    *     put current to sleep (set state to TASK_INTERRUPTIBLE)
+    *     wait for periodic timer mechanism 
+    *     upon waking, return 0
+    */
 }
