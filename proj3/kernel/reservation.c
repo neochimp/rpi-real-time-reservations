@@ -19,7 +19,20 @@ SYSCALL_DEFINE3(set_rsv,
 	struct task_struct *target_task;
     struct pid *kernel_pid;
     struct timespec C_local, T_local;
-    int ret;
+
+    // checking task's task_struct using provided pid
+    if (pid == 0)
+        target_task = current;
+    else {
+        kernel_pid = find_vpid(pid);
+        if (!kernel_pid)
+            return -1;
+
+        target_task = pid_task(kernel_pid, PIDTYPE_PID);
+        if (!target_task)
+            return -1;
+    }
+
 
     /*
      * task_struct *target_task

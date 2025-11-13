@@ -73,5 +73,6 @@ int main(int argc, char* argv[]) {
 	end = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
 
     elapsed_ms = (end - start) / MSEC_PER_SEC;
-	printf("Took: %.3f ms (%.lld microseconds)\n", elapsed_ms, end-start);
+    printf("Requested execution time: %.3f ms\n", (double)target_ms);
+	printf("Actual execution time: %.3f ms\n", elapsed_ms, end-start);
 }
