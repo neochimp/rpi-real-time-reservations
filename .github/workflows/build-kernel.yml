@@ -1,0 +1,62 @@
+name: Build Raspberry Pi Kernel (Students DO NOT use)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build"
+        required: true
+        default: "project" # project1, project2, etc...
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    container:
+      image: ubuntu:20.04
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      ARCH: arm
+      CROSS_COMPILE: arm-linux-gnueabihf-
+
+    steps:
+      - name: Install deps
+        run: |
+          apt-get update
+          apt-get install -y \
+            zip git ca-certificates bc bison flex libssl-dev make libc6-dev libncurses5-dev \
+            crossbuild-essential-armhf file xz-utils tar findutils coreutils
+
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Ensure kernel config exists (optional safety)
+        run: |
+          if [ ! -f .config ]; then
+            echo "No .config found; using cs596-rpi-4.9.80-config"
+            cp cs596-rpi-4.9.80-config .config
+          fi
+
+      - name: Build kernel, modules, and device trees
+        env:
+          KERNEL: kernel7
+        run: |
+          echo "Building with $(nproc) cores (ARCH=${ARCH}, CROSS_COMPILE=${CROSS_COMPILE})"
+          make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} zImage modules dtbs -j$(nproc)
+
+      - name: Zip entire repo (with build outputs)
+        run: |
+          # Create a single zip of the current working tree, excluding the .git dir
+          zip -r repo-with-build.zip . -x ".git/*"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-with-build
+          path: repo-with-build.zip
+          if-no-files-found: error
+          compression-level: 0
