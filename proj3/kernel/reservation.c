@@ -7,6 +7,10 @@
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
 
+#define NSEC_PER_SEC 1 000 000 000LL
+#define MSEC_PER_SEC 1 000.0
+
+
 /*
  * Assigns or "reserves" a CPU time budget (C) over a period (T) for a specific task
  */
@@ -15,25 +19,6 @@ SYSCALL_DEFINE3(set_rsv,
                 struct timespec __user *, C, 
                 struct timespec __user *, T)
 {
-    // struct task_struct current; defined in <linux/sched.h>
-	struct task_struct *target_task;
-    struct pid *kernel_pid;
-    struct timespec C_local, T_local;
-
-    // checking task's task_struct using provided pid
-    if (pid == 0)
-        target_task = current;
-    else {
-        kernel_pid = find_vpid(pid);
-        if (!kernel_pid)
-            return -1;
-
-        target_task = pid_task(kernel_pid, PIDTYPE_PID);
-        if (!target_task)
-            return -1;
-    }
-
-
     /*
      * task_struct *target_task
      * find target_task's task_struct from pid
@@ -47,6 +32,48 @@ SYSCALL_DEFINE3(set_rsv,
      * initialize kernel mechanisms (timers) to manage the reservation
      * return 0
      */
+
+    // struct task_struct current; defined in <linux/sched.h>
+	struct task_struct *target_task;
+    struct pid *kernel_pid;
+    struct timespec C_local, T_local;
+
+    // find target_task's task_struct using provided pid
+    if (pid == 0)
+        target_task = current;
+    else
+    {
+        kernel_pid = find_vpid(pid);
+        if (!kernel_pid)
+            return -1;
+
+        target_task = pid_task(kernel_pid, PIDTYPE_PID);
+        if (!target_task)
+            return -1;
+    }
+
+    // C and T are valid addresses from user space
+    if (copy_from_user(&C_local, C, sizeof(C)))
+        return -1;
+    if (copy_from_user(&T_local, T, sizeof(T)))
+        return -1;
+    
+    long long C_ns = C_local.tv_sec * NSEC_PER_SEC + C_local.tv_nsec;
+    long long T_ns = T_local.tv_sec * NSEC_PER_SEC + T_local.tv_nsec;
+
+    // C and T are valid times
+    if (C_ns < 0 || T_ns < C_ns)
+    {
+        return -1
+    }
+
+    // target already has an active reservation
+    if (target->rsv_active)
+        return -1
+    
+    target->rsv_C = C_local;
+    target->rsv_T = T_local;
+    return 0;
 }
 
 

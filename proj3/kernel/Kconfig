@@ -1,0 +1,3 @@
+config PROJ3_RSV
+    bool "Enable rsv system"
+    default y
