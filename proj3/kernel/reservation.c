@@ -7,8 +7,8 @@
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
 
-#define NSEC_PER_SEC 1 000 000 000LL
-#define MSEC_PER_SEC 1 000.0
+#define NSEC_PER_SEC 1000000000LL
+#define MSEC_PER_SEC 1000.0
 
 
 /*
@@ -39,24 +39,27 @@ SYSCALL_DEFINE3(set_rsv,
     struct timespec C_local, T_local;
 
     // find target_task's task_struct using provided pid
-    if (pid == 0)
+    if (pid == 0) {
         target_task = current;
+        get_task_struct(target_task);
+    } 
     else
     {
-        kernel_pid = find_vpid(pid);
-        if (!kernel_pid)
-            return -1;
+        rcu_read_lock();
+        target_task = find_task_by_pid_ns(pid, task_active_pid_ns(current));
+        if (target_task)
+            get_task_struct(target_task);
 
-        target_task = pid_task(kernel_pid, PIDTYPE_PID);
-        if (!target_task)
-            return -1;
+        rcu_read_unlock();
+        if (!target_task) return -1;
     }
 
     // C and T are valid addresses from user space
-    if (copy_from_user(&C_local, C, sizeof(C)))
+    if (copy_from_user(&C_local, C, sizeof(*C)) ||
+        copy_from_user(&T_local, T, sizeof(*T))) {
+        put_task_struct(target_task);
         return -1;
-    if (copy_from_user(&T_local, T, sizeof(T)))
-        return -1;
+    }
     
     long long C_ns = C_local.tv_sec * NSEC_PER_SEC + C_local.tv_nsec;
     long long T_ns = T_local.tv_sec * NSEC_PER_SEC + T_local.tv_nsec;
@@ -64,15 +67,21 @@ SYSCALL_DEFINE3(set_rsv,
     // C and T are valid times
     if (C_ns < 0 || T_ns < C_ns)
     {
-        return -1
+        put_task_struct(target_task);
+        return -1;
     }
 
     // target already has an active reservation
-    if (target->rsv_active)
-        return -1
+    if (target_task->rsv_active) {
+        put_task_struct(target_task);
+        return -1;
+    }
     
-    target->rsv_C = C_local;
-    target->rsv_T = T_local;
+    target_task->rsv_C = C_local;
+    target_task->rsv_T = T_local;
+    target_task->rsv_active = true;
+
+    put_task_struct(target_task);
     return 0;
 }
 
