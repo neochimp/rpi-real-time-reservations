@@ -1,4 +1,3 @@
-//Just a skeleton for now
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/sched.h>
@@ -6,6 +5,26 @@
 #include <linux/pid.h>
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
+
+#define NSEC_PER_SEC 1000000000LL
+#define MSEC_PER_SEC 1000.0
+
+
+task_struct* rsv_get_task_by_pid(pid_t pid) {
+	struct task_struct *target_task = NULL;
+
+    // find target_task's task_struct using provided pid
+    if (pid == 0)
+        target_task = current;
+    else
+    {
+        rcu_read_lock();
+        target_task = find_task_by_pid_ns(pid, task_active_pid_ns(current));
+        rcu_read_unlock();
+    }
+
+    return target_task;
+}
 
 /*
  * Assigns or "reserves" a CPU time budget (C) over a period (T) for a specific task
@@ -15,12 +34,6 @@ SYSCALL_DEFINE3(set_rsv,
                 struct timespec __user *, C, 
                 struct timespec __user *, T)
 {
-    // struct task_struct current; defined in <linux/sched.h>
-	struct task_struct *target_task;
-    struct pid *kernel_pid;
-    struct timespec C_local, T_local;
-    int ret;
-
     /*
      * task_struct *target_task
      * find target_task's task_struct from pid
@@ -34,6 +47,41 @@ SYSCALL_DEFINE3(set_rsv,
      * initialize kernel mechanisms (timers) to manage the reservation
      * return 0
      */
+
+    // struct task_struct current; defined in <linux/sched.h>
+	struct task_struct *target_task;
+    struct timespec C_local, T_local;
+
+    // find target_task's task_struct using provided pid
+    target_task = rsv_get_task_by_pid(pid);
+    if (!target_task)
+        return -1;
+
+    // C and T are valid addresses from user space
+    if (copy_from_user(&C_local, C, sizeof(*C)) ||
+        copy_from_user(&T_local, T, sizeof(*T)))
+        return -1;
+    
+    long long C_ns = C_local.tv_sec * NSEC_PER_SEC + C_local.tv_nsec;
+    long long T_ns = T_local.tv_sec * NSEC_PER_SEC + T_local.tv_nsec;
+
+    // C and T are valid times
+    if (C_ns < 0 || T_ns < C_ns)
+        return -1;
+
+    // target already has an active reservation
+    if (target_task->rsv_active)
+        return -1;
+    
+    // store C, T into target_task's task_struct
+    target_task->rsv_C = C_local;
+    target_task->rsv_T = T_local;
+    target_task->rsv_active = true;
+
+    // hrtimer_init(target_task->rsv_timer_pointer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+    // target_task->rsv_timer_pointer
+    
+    return 0;
 }
 
 
@@ -54,6 +102,18 @@ SYSCALL_DEFINE1(cancel_rsv,
      * else:
      *     return -1
      */
+    struct task_struct *target_task;
+
+    target_task = rsv_get_task_by_pid(pid);
+    if (!target_task)
+        return -1;
+    if (!target_task->rsv_active)
+        return -1;
+
+    target_task->rsv_C = NULL;
+    target_task->rsv_T = NULL;
+    target_task->rsv_active = false;
+
 }
 
 /*
