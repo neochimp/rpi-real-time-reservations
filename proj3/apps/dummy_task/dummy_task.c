@@ -6,20 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define USEC_PER_SEC 1000000LL
-#define MSEC_PER_SEC 1000.0
+#include "dummy_task.h"
 
-#define INNER_ITERATIONS 1000 // how many times our "nop" instruction is ran
-#define DEFAULT_CALIB    1000 // initial guess for calib
-
-#define CALIB_WARMUP_MS   500 // each CPU warmup burst
-#define CALIB_WARMUP_RUNS 2   // how many warmups
-#define CALIB_TARGET_MS   100 // each measured run target
-#define CALIB_ITERATIONS  10  // how many measured runs
-
-
-// global calibration var
-int dummy_load_calib = DEFAULT_CALIB;
 
 void dummy_load(int execution_time_ms) {
     int i, j;
@@ -32,8 +20,8 @@ void dummy_load(int execution_time_ms) {
 void calibrate() {
     struct timeval tv;
     long long start_us, end_us;
-    double total_time = 0.0;
-    
+    double total_time = 0.0;    
+
     // stabilize CPU
     for (int i = 0; i < CALIB_WARMUP_RUNS; i++) {
         dummy_load(CALIB_WARMUP_MS);
@@ -60,6 +48,7 @@ int main(int argc, char* argv[]) {
 	struct timeval tv;
     long long start, end;
     double elapsed_ms;
+    (void)argc;
 
     int target_ms = atoi(argv[1]);
 
@@ -74,5 +63,5 @@ int main(int argc, char* argv[]) {
 
     elapsed_ms = (end - start) / MSEC_PER_SEC;
     printf("Requested execution time: %.3f ms\n", (double)target_ms);
-	printf("Actual execution time: %.3f ms\n", elapsed_ms, end-start);
+	printf("Actual execution time: %.3f ms\n", elapsed_ms);
 }
