@@ -78,8 +78,8 @@ SYSCALL_DEFINE3(set_rsv,
     target_task->rsv_T = T_local;
     target_task->rsv_active = true;
 
-    hrtimer_init(target_task->rsv_timer_pointer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
-    target_task->rsv_timer_pointer
+    // hrtimer_init(target_task->rsv_timer_pointer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+    // target_task->rsv_timer_pointer
     
     return 0;
 }
