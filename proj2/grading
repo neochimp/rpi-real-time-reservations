@@ -1,0 +1,6 @@
+5.1: 10 Full credit, but next time have the same executable name as the .c file. It should've been ./usrhello (yours was ./userhello which makes my auto test script not work)														
+5.2: 20 Good														
+5.3.1: 25 Good														
+5.3.2: 20 Good														
+5.3.3: 15 Good														
+5.4: 10
