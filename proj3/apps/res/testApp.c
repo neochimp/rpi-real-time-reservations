@@ -15,6 +15,9 @@
 #ifndef __NR_cancel_rsv
 #define __NR_cancel_rsv 398
 #endif
+#ifndef __NR_wait_until_next_period
+#define __NR_wait_until_next_period 399
+#endif
 
 
 struct threadTimes {
@@ -26,6 +29,14 @@ static long set_rsv(pid_t pid, const struct timespec *C, const struct timespec *
     return syscall(__NR_set_rsv, pid, C, T);
 }
 
+static long cancel_rsv(pid_t pid){
+	return syscall(__NR_cancel_rsv, pid);
+}
+
+static long wait_until_next_period(void){
+	return syscall(__NR_wait_until_next_period);
+}
+`
 void *taskThread(void *arg){
 	struct threadTimes *tt = (struct threadTimes *)arg;
 
@@ -37,7 +48,10 @@ void *taskThread(void *arg){
 		return NULL;
 	}
 	printf("set_rsv okk\n");
+	cancel_rsv(getpid());
+	cancel_rsv(getpid());
 	//while(1);
+	wait_until_next_period();
 
 	return NULL;
 }

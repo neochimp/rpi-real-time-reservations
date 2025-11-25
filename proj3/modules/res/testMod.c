@@ -10,10 +10,11 @@
 
 extern long (*set_rsv_hook)(pid_t, const struct timespec __user *,
                             const struct timespec __user *);
-
+extern long (*cancel_rsv_hook)(pid_t);
+extern long (*wait_until_next_period_hook)();
 extern struct task_struct *rsv_get_task_by_pid(pid_t pid);
 
-static long my_set_rsv(pid_t pid, const struct timespec __user *C,
+static long mod_set_rsv(pid_t pid, const struct timespec __user *C,
                        const struct timespec __user *T) {
   	// current task struct, defined in linux/sched.h
 	struct task_struct *target_task;	
@@ -47,9 +48,36 @@ static long my_set_rsv(pid_t pid, const struct timespec __user *C,
 	return 0; // success
 }
 
+static long mod_cancel_rsv(pid_t pid){
+	struct task_struct *target_task;
+	target_task = rsv_get_task_by_pid(pid);
+
+	if(!target_task)
+		return -1;
+	if(!target_task->rsv_active){
+		pr_info("cancel_rsv: No reservation on pid%d\n", pid);
+	}
+
+	target_task->rsv_C.tv_sec = 0;
+	target_task->rsv_C.tv_nsec = 0;
+
+	target_task->rsv_T.tv_sec = 0;
+	target_task->rsv_T.tv_nsec = 0;
+	target_task->rsv_active = false;
+
+	pr_info("cancel_rsv: Reservation for pid%d cancelled", pid);
+	return 0;
+}
+
+static long mod_wait_until_next_period(){
+	return 0;
+}
+
 static int __init mod_init(void) {
-  set_rsv_hook = my_set_rsv;
-  pr_info("set_rsv hook installed\n");
+  set_rsv_hook = mod_set_rsv;
+  cancel_rsv_hook = mod_cancel_rsv;
+  wait_until_next_period_hook = mod_wait_until_next_period;
+  pr_info("hooks installed\n");
   return 0;
 }
 
