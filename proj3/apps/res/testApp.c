@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <pthread.h>
 
 #ifndef __NR_set_rsv
 #define __NR_set_rsv 397
@@ -15,26 +16,46 @@
 #define __NR_cancel_rsv 398
 #endif
 
+
+struct threadTimes {
+	struct timespec C;
+	struct timespec T;
+};
+
 static long set_rsv(pid_t pid, const struct timespec *C, const struct timespec *T) {
     return syscall(__NR_set_rsv, pid, C, T);
 }
 
-int main(void) {
-    pid_t pid = getpid();
+void *taskThread(void *arg){
+	struct threadTimes *tt = (struct threadTimes *)arg;
 
-    struct timespec C, T;
-    memset(&C, 0, sizeof(C));
-    memset(&T, 0, sizeof(T));
-    // Example values; adjust to what your kernel expects:
-    C.tv_sec  = 0;     C.tv_nsec = 1000;
-    T.tv_sec  = 0;     T.tv_nsec = 2000;
+	printf("C: %ld T: %ld", tt->C.tv_nsec, tt->T.tv_nsec);
+	long ret = set_rsv(getpid(), &tt->C, &tt->T);
+	if(ret == -1){
+		
+        	fprintf(stderr, "set_rsv failed: %s (errno=%d)\n", strerror(errno), errno);
+		return NULL;
+	}
+	printf("set_rsv okk\n");
+	//while(1);
 
-    long ret = set_rsv(pid, &C, &T);
-    if (ret == -1) {
-        fprintf(stderr, "set_rsv failed: %s (errno=%d)\n", strerror(errno), errno);
-        return 1;
-    }
-    printf("set_rsv ok: ret=%ld\n", ret);
-    return 0;
+	return NULL;
 }
+
+
+int main(void) {
+
+	struct threadTimes task1Struct;
+
+    	task1Struct.C.tv_nsec = 1000;
+	task1Struct.T.tv_nsec = 2000;
+    	
+	pthread_t task1;
+	pthread_create(&task1, NULL, taskThread, &task1Struct);
+
+	pthread_join(task1, NULL);
+	return 0;
+}
+
+
 
