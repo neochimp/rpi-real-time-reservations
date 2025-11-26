@@ -21,7 +21,7 @@ void calibrate() {
     struct timeval tv;
     long long start_us, end_us;
     double total_time = 0.0;    
-
+	printf("[*] DUMMY LOAD CALIBRATING\n");
     // stabilize CPU
     for (int i = 0; i < CALIB_WARMUP_RUNS; i++) {
         dummy_load(CALIB_WARMUP_MS);
@@ -42,26 +42,27 @@ void calibrate() {
     }
     dummy_load_calib = (int)(((double)dummy_load_calib * CALIB_TARGET_MS / 
                        (total_time / CALIB_ITERATIONS)) + 0.5);
+	printf("[*] DUMMY LOAD CALIBRATED\n");
 }
 
-int main(int argc, char* argv[]) {
-	struct timeval tv;
-    long long start, end;
-    double elapsed_ms;
-    (void)argc;
-
-    int target_ms = atoi(argv[1]);
-
-    calibrate();
-    gettimeofday(&tv, NULL);
-    start = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
-
-	dummy_load(target_ms);
-
-	gettimeofday(&tv, NULL);
-	end = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
-
-    elapsed_ms = (end - start) / MSEC_PER_SEC;
-    printf("Requested execution time: %.3f ms\n", (double)target_ms);
-	printf("Actual execution time: %.3f ms\n", elapsed_ms);
-}
+//int main(int argc, char* argv[]) {
+//	struct timeval tv;
+//    long long start, end;
+//    double elapsed_ms;
+//    (void)argc;
+//
+//    int target_ms = atoi(argv[1]);
+//
+//    calibrate();
+//    gettimeofday(&tv, NULL);
+//    start = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
+//
+//	dummy_load(target_ms);
+//
+//	gettimeofday(&tv, NULL);
+//	end = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
+//
+//    elapsed_ms = (end - start) / MSEC_PER_SEC;
+//    printf("Requested execution time: %.3f ms\n", (double)target_ms);
+//	printf("Actual execution time: %.3f ms\n", elapsed_ms);
+//}

@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <sys/wait.h>
 
+#include "dummy_task.h"
+
 #ifndef __NR_set_rsv
 #define __NR_set_rsv 397
 #endif
@@ -41,14 +43,16 @@ static long wait_until_next_period(void){
 
 int main(void) {
 
-	long Cvals[5] = {2, 1, 4, 5, 1};
-	long Tvals[5] = {5, 4, 5, 7, 1};
+	long Cvals[5] = {100e6, 100e6, 40e6, 50e6, 10e6};
+	long Tvals[5] = {500e6, 400e6, 50e6, 70e6, 10e6};
+	
+	calibrate();
 
-	for(int i = 0; i < 5; i++){
+	for(int i = 0; i < 1; i++){
 		pid_t pid = fork();
 		if(pid == 0){
-			struct timespec C = {.tv_sec=0, .tv_nsec = Cvals[i]};
-			struct timespec T = {.tv_sec=0, .tv_nsec = Tvals[i]};
+			struct timespec C = {.tv_nsec=Cvals[i], .tv_sec = 0};
+			struct timespec T = {.tv_nsec=Tvals[i], .tv_sec = 0};
 		
 
 			printf("Child PID %d: C=%ld T=%ld\n", getpid(), C.tv_nsec, T.tv_nsec);
@@ -58,15 +62,29 @@ int main(void) {
 				perror("set_rsv");
 				exit(1);
 			}
-
+			long long C_ns = (long long)(C.tv_sec * 1e9 + C.tv_nsec);
+			long long C_ms = C_ns / 1e6;
+			
+			long long T_ns = (long long)(T.tv_sec * 1e9 + T.tv_nsec);
+			long long T_ms = T_ns / 1e6;
 			while(1){
-		
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				printf("PID:%d t=%lld.%09ld Starting Task, Task: %lldms, Period: %lldms\n", getpid(), (long long)now.tv_sec, now.tv_nsec, C_ms, T_ms);
+				dummy_load(C_ms);
+				printf("PID:%d dummy loaded\n", getpid());
+				long wret = wait_until_next_period();
+				if(wret < 0){
+					perror("wait_until_next_period\n");
+					exit(1);
+				}
+				printf("PID:%d waited until next period\n", getpid());
 			}
 
 			exit(0);
 		}
 	}
-	for (int i = 0; i < 5; i++){
+	for (int i = 0; i < 2; i++){
 		wait(NULL);
 	}
 

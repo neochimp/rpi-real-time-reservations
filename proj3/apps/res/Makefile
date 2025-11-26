@@ -1,9 +1,13 @@
 CC:=arm-linux-gnueabihf-gcc
-CPP:=arm-linux-gnueabihf-gpp
+CXX:=arm-linux-gnueabihf-g++
 
+CFLAGS += -pthread -I../dummy_task
 
-all:
-	$(CC) -pthread -o testApp testApp.c
+SRCS := testApp.c ../dummy_task/dummy_task.c
+OBJS := $(SRCS:.c=.c)
 
-clean:
-	rm -f testApp
+all: testApp
+
+testApp: $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+	

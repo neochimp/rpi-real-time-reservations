@@ -5,7 +5,7 @@ set -euo pipefail
 CONFIG_FILE="cs596-rpi-4.9.80-config"
 KERNEL_NAME="kernel7"
 CROSS_COMPILE="arm-linux-gnueabihf-"
-DEVICE="/dev/sdb"          # SD card device (no partition number)
+DEVICE="/dev/sdc"          # SD card device (no partition number)
 MNT_BOOT="mnt/boot"
 MNT_ROOT="mnt/root"
 JOBS="$(nproc)"
@@ -28,9 +28,9 @@ sudo mount "${DEVICE}2" "$MNT_ROOT"
 
 echo "[*] Installing modules to rootfs..."
 sudo env PATH="$PATH" make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" \
-    INSTALL_MOD_PATH="$MNT_ROOT" \
-    -j"$JOBS" \
-    modules_install
+    #INSTALL_MOD_PATH="$MNT_ROOT" \
+    #-j"$JOBS" \
+    #modules_install
 
 echo "[*] Backing up existing kernel on boot partition..."
 if [ -f "$MNT_BOOT/$KERNEL_NAME.img" ]; then

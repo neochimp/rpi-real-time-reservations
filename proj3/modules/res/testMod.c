@@ -11,6 +11,8 @@
 #include <linux/sched/prio.h> //MAX_RT_PRIO
 #include <linux/wait.h>
 #include <linux/hrtimer.h>
+#include <linux/math64.h>
+#include <linux/signal.h>
 
 //4.3 RT priority assignment
 #define MAX_RSV 50
@@ -85,11 +87,7 @@ static void rsv_update_priorities(void){
 			}
 		}
 	}
-
-
 }
-
-
 
 
 static void rsv_table_add(struct task_struct *curr_task, u64 T_ns){
@@ -171,22 +169,33 @@ static long mod_set_rsv(pid_t pid, const struct timespec __user *C,
 		return -1;
 	}
 
+	//part 4.4 conditions used to wake the timer for wait_until_next_period();
+	if(!target_task->rsv_active){
+		init_waitqueue_head(&target_task->rsv_wq); //declare rsv_wq
+		target_task->rsv_period_elapsed = false;
+		hrtimer_init(&target_task->rsv_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED); //define the timer
+		target_task->rsv_timer.function = rsv_timer_callback; //set the callback function to our custom function
+	}else{
+		hrtimer_cancel(&target_task->rsv_timer);
+	}
+
 	//store C, T into target_task's task_struct
 	target_task->rsv_C = *C;
 	target_task->rsv_T = *T;
 	target_task->rsv_active = true;
 	
-	pr_info("Successfully set task values C: %ld, T: %ld\n", target_task->rsv_C.tv_sec*NSEC_PER_SEC+C->tv_nsec, target_task->rsv_T.tv_sec*NSEC_PER_SEC+T->tv_nsec);
+	pr_info("Successfully set task values C: %lld, T: %lld\n", (long long)(target_task->rsv_C.tv_sec*NSEC_PER_SEC+target_task->rsv_C.tv_nsec), (long long)(target_task->rsv_T.tv_sec*NSEC_PER_SEC+target_task->rsv_T.tv_nsec));
+
+
+	hrtimer_start(&target_task->rsv_timer, ns_to_ktime(T_ns), HRTIMER_MODE_REL_PINNED); //start the timer
 
 	//lock critical section
-	pr_info("entering critical\n");
 	unsigned long flags;
 	spin_lock_irqsave(&rsv_lock, flags);
-	pr_info("inside critical\n");
 	rsv_table_add(target_task, T_ns);
 	spin_unlock_irqrestore(&rsv_lock, flags);
 	
-	printTasks();
+	
 	return 0; // success
 }
 
@@ -207,9 +216,18 @@ static long mod_cancel_rsv(pid_t pid){
 	target_task->rsv_T.tv_nsec = 0;
 	target_task->rsv_active = false;
 
+	//part 4.4 
+	hrtimer_cancel(&target_task->rsv_timer); //cancel timer
+	wake_up_interruptible(&target_task->rsv_wq); //wake up wait_until_next_period()
+	target_task->rsv_period_elapsed = false; //clear the condition used by wait_until_next_period()
+
 	pr_info("cancel_rsv: Reservation for pid%d cancelled", pid);
 	
-	//lock critical section
+	
+	//part 4.5
+	target_task->rsv_accumulated_ns = 0;
+	target_task->rsv_last_start_ns = 0;
+
 	unsigned long flags;
 	spin_lock_irqsave(&rsv_lock, flags);
 	rsv_table_remove(target_task);
@@ -219,7 +237,67 @@ static long mod_cancel_rsv(pid_t pid){
 }
 
 static long mod_wait_until_next_period(void){
+	pr_info("waiting until next period\n");	
+	//check if there is an active rsv
+	if(!current->rsv_active){
+		pr_info("mod_wait_until_next_period: no active reservation");
+		return -1;
+	}
+
+	current->rsv_period_elapsed = false;
+
+	//if wait_event_interruptible returns true, something wrong happened.
+	if(wait_event_interruptible(current->rsv_wq, current->rsv_period_elapsed)) {
+		return -1;
+	}
+	//check if rsv cancelled while slept
+	if(!current->rsv_active){
+		pr_info("mod_wait_until_next_period: reservation cancelled while slept");
+		return -1;
+	}
+
 	return 0;
+}
+
+//hrtimer callback function
+static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
+	//get the task_struct by using the hrtimer
+	struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
+	
+	
+	//TODO: 4.6 budget overrun notification
+
+	if(!task){
+		pr_info("rsv_timer_callback: task is NULL\n");
+		return HRTIMER_NORESTART;
+	}
+
+	if(!task->rsv_active)
+		return HRTIMER_NORESTART;
+
+	//4.5 accumulator
+	u64 C_ns = timespec_to_ns(&task->rsv_C);
+	u64 used = task->rsv_accumulated_ns;
+	
+	if(C_ns > 0 && used > C_ns){
+		u64 util_pct = div64_u64(used * 1000, C_ns);
+		u64 mod = do_div(util_pct, 10);
+		printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
+		
+		//4.6 overrun notification
+		send_sig(SIGUSR1, task, 0);
+	}
+
+	//reset accumulator for next period
+	task->rsv_accumulated_ns = 0; 
+	task->rsv_last_start_ns = ktime_get_ns();
+
+	task->rsv_period_elapsed = true;
+	wake_up_interruptible(&task->rsv_wq);
+
+	//rearm
+	hrtimer_forward_now(timer, timespec_to_ktime(task->rsv_T));
+	return HRTIMER_RESTART;
 }
 
 static int __init mod_init(void) {
