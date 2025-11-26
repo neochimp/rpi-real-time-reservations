@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/printk.h>
@@ -28,7 +29,8 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer); //forward
 //rsv table functions
 static void rsv_update_priorities(void){
 	u64 unique_periods[MAX_RSV];
-	int num_unique, i, j;
+	int num_unique = 0;
+	int i, j;
 
 	//find all unique periods
 	for(i = 0; i < MAX_RSV; i++){
@@ -62,12 +64,24 @@ static void rsv_update_priorities(void){
 
 	//doing the priority updating
 	for(i = 0; i < num_unique; i++){
-		int prio = (MAX_RT_PRIO - 1) -1;
+		int prio = (MAX_RT_PRIO - 1) -i;
+		if(prio < 0)
+			prio = 0;
+
 		for(j = 0; j < MAX_RSV; j++){
-			if(rsv_table[j].used && rsv_table[j].T_ns == unique_periods[i]){
-				struct sched_param param;
+			if(rsv_table[j].used && 
+				rsv_table[j].T_ns == unique_periods[i] &&
+				rsv_table[j].task){
+
+				struct sched_param param = {0};
+				int ret;
 				param.sched_priority = prio;
-				sched_setscheduler_nocheck(rsv_table[j].task, SCHED_FIFO, &param);
+				ret = sched_setscheduler_nocheck(rsv_table[j].task, SCHED_FIFO, &param);
+				if(ret){
+					pr_info("sched scheduler failed for pid%d, ret%d\n", rsv_table[j].task->pid, ret);
+				}else{
+					pr_info("set pid=%d SCHED_FIFO rt_prio=%d", rsv_table[j].task->pid, prio);
+				}
 			}
 		}
 	}
@@ -85,11 +99,12 @@ static void rsv_table_add(struct task_struct *curr_task, u64 T_ns){
 			rsv_table[i].used = true;
 			rsv_table[i].task = curr_task;
 			rsv_table[i].T_ns = T_ns;
+			
+			rsv_update_priorities();
 			return;
 		}
 	}
 	//TODO: condition for if table is full
-	rsv_update_priorities();
 }
 
 static void rsv_table_remove(struct task_struct *curr_task) {
@@ -110,8 +125,9 @@ static void printTasks(void){
 	int i;
 	pr_info("**Current tasks scheduled:\n");
 	for(i = 0; i < MAX_RSV; i++){
-		if(rsv_table[i].used){
-			pr_info("   PID: %d, T: %lld\n", rsv_table[i].task->pid, rsv_table[i].T_ns);
+		if(rsv_table[i].used && rsv_table[i].task){
+			struct task_struct *p = rsv_table[i].task;
+			pr_info("   PID: %d, T: %lld, Priority: %d\n", p->pid, rsv_table[i].T_ns, p->rt_priority);
 		}
 	}
 }
