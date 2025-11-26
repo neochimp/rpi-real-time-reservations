@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/wait.h>
 
 #ifndef __NR_set_rsv
 #define __NR_set_rsv 397
@@ -36,38 +37,40 @@ static long cancel_rsv(pid_t pid){
 static long wait_until_next_period(void){
 	return syscall(__NR_wait_until_next_period);
 }
-`
-void *taskThread(void *arg){
-	struct threadTimes *tt = (struct threadTimes *)arg;
-
-	printf("C: %ld T: %ld", tt->C.tv_nsec, tt->T.tv_nsec);
-	long ret = set_rsv(getpid(), &tt->C, &tt->T);
-	if(ret == -1){
-		
-        	fprintf(stderr, "set_rsv failed: %s (errno=%d)\n", strerror(errno), errno);
-		return NULL;
-	}
-	printf("set_rsv okk\n");
-	cancel_rsv(getpid());
-	cancel_rsv(getpid());
-	//while(1);
-	wait_until_next_period();
-
-	return NULL;
-}
 
 
 int main(void) {
 
-	struct threadTimes task1Struct;
+	long Cvals[5] = {2, 1, 4, 5, 1};
+	long Tvals[5] = {5, 4, 5, 7, 1};
 
-    	task1Struct.C.tv_nsec = 1000;
-	task1Struct.T.tv_nsec = 2000;
-    	
-	pthread_t task1;
-	pthread_create(&task1, NULL, taskThread, &task1Struct);
+	for(int i = 0; i < 5; i++){
+		pid_t pid = fork();
+		if(pid == 0){
+			struct timespec C = {.tv_sec=0, .tv_nsec = Cvals[i]};
+			struct timespec T = {.tv_sec=0, .tv_nsec = Tvals[i]};
+		
 
-	pthread_join(task1, NULL);
+			printf("Child PID %d: C=%ld T=%ld\n", getpid(), C.tv_nsec, T.tv_nsec);
+
+			long ret = set_rsv(getpid(), &C, &T);
+			if(ret == -1){
+				perror("set_rsv");
+				exit(1);
+			}
+
+			while(1){
+		
+			}
+
+			exit(0);
+		}
+	}
+	for (int i = 0; i < 5; i++){
+		wait(NULL);
+	}
+
+
 	return 0;
 }
 

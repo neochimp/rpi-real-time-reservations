@@ -1,6 +1,9 @@
-CC=gcc
-CPP=gpp
+CC:=arm-linux-gnueabihf-gcc
+CPP:=arm-linux-gnueabihf-gpp
 
 
 all:
-	$(CROSS_COMPILE)$(CC) -pthread -o testApp testApp.c
+	$(CC) -pthread -o testApp testApp.c
+
+clean:
+	rm -f testApp
