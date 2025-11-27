@@ -5,7 +5,7 @@ set -euo pipefail
 CONFIG_FILE="cs596-rpi-4.9.80-config"
 KERNEL_NAME="kernel7"
 CROSS_COMPILE="arm-linux-gnueabihf-"
-DEVICE="/dev/sdc"          # SD card device (no partition number)
+DEVICE="/dev/sdb"          # SD card device (no partition number)
 MNT_BOOT="mnt/boot"
 MNT_ROOT="mnt/root"
 JOBS="$(nproc)"

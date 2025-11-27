@@ -43,12 +43,12 @@ static long wait_until_next_period(void){
 
 int main(void) {
 
-	long Cvals[5] = {100e6, 100e6, 40e6, 50e6, 10e6};
-	long Tvals[5] = {500e6, 400e6, 50e6, 70e6, 10e6};
+	long long Cvals[5] = {1000e6, 100e6, 400e6, 50e6, 10e6};
+	long long Tvals[5] = {5000e6, 400e6, 500e6, 70e6, 10e6};
 	
 	calibrate();
 
-	for(int i = 0; i < 1; i++){
+	for(int i = 0; i < 3; i++){
 		pid_t pid = fork();
 		if(pid == 0){
 			struct timespec C = {.tv_nsec=Cvals[i], .tv_sec = 0};
@@ -57,7 +57,7 @@ int main(void) {
 
 			printf("Child PID %d: C=%ld T=%ld\n", getpid(), C.tv_nsec, T.tv_nsec);
 
-			long ret = set_rsv(getpid(), &C, &T);
+			long long ret = set_rsv(getpid(), &C, &T);
 			if(ret == -1){
 				perror("set_rsv");
 				exit(1);
@@ -75,7 +75,7 @@ int main(void) {
 				printf("PID:%d dummy loaded\n", getpid());
 				long wret = wait_until_next_period();
 				if(wret < 0){
-					perror("wait_until_next_period\n");
+					printf("wait_until_next_period broke\n");
 					exit(1);
 				}
 				printf("PID:%d waited until next period\n", getpid());

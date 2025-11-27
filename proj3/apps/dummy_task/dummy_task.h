@@ -5,7 +5,7 @@
 #define MSEC_PER_SEC 1000.0
 
 #define INNER_ITERATIONS 1000 // how many times our "nop" instruction is ran
-#define DEFAULT_CALIB    1000 // initial guess for calib
+#define DEFAULT_CALIB    200 // initial guess for calib
 
 #define CALIB_WARMUP_MS   500 // each CPU warmup burst
 #define CALIB_WARMUP_RUNS 2   // how many warmups

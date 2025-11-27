@@ -129,7 +129,12 @@ static void printTasks(void){
 		}
 	}
 }
+//helper function for clarity
+static void resetAccumulator(struct task_struct *task){
+	task->rsv_accumulated_ns = 0;
+	pr_info("accumulator reset\n");
 
+}
 extern long (*set_rsv_hook)(pid_t, const struct timespec __user *,
                             const struct timespec __user *);
 extern long (*cancel_rsv_hook)(pid_t);
@@ -196,7 +201,7 @@ static long mod_set_rsv(pid_t pid, const struct timespec __user *C,
 	spin_unlock_irqrestore(&rsv_lock, flags);
 	
 	
-	return 0; // success
+	.return 0; // success
 }
 
 static long mod_cancel_rsv(pid_t pid){
@@ -265,8 +270,6 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
 	struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
 	
 	
-	//TODO: 4.6 budget overrun notification
-
 	if(!task){
 		pr_info("rsv_timer_callback: task is NULL\n");
 		return HRTIMER_NORESTART;
@@ -279,18 +282,19 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
 	u64 C_ns = timespec_to_ns(&task->rsv_C);
 	u64 used = task->rsv_accumulated_ns;
 	
+	printk(KERN_INFO "Pre-check C: %llu, used: %llu\n", C_ns, used);
 	if(C_ns > 0 && used > C_ns){
 		u64 util_pct = div64_u64(used * 1000, C_ns);
 		u64 mod = do_div(util_pct, 10);
 		printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
 		
 		//4.6 overrun notification
-		send_sig(SIGUSR1, task, 0);
+		//send_sig(SIGUSR1, task, 0);
 	}
 
-	//reset accumulator for next period
-	task->rsv_accumulated_ns = 0; 
-	task->rsv_last_start_ns = ktime_get_ns();
+	//reset accumulator for next task
+	resetAccumulator(task);
+
 
 	task->rsv_period_elapsed = true;
 	wake_up_interruptible(&task->rsv_wq);
@@ -299,6 +303,8 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
 	hrtimer_forward_now(timer, timespec_to_ktime(task->rsv_T));
 	return HRTIMER_RESTART;
 }
+
+
 
 static int __init mod_init(void) {
   set_rsv_hook = mod_set_rsv;

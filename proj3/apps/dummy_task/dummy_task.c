@@ -11,10 +11,23 @@
 
 void dummy_load(int execution_time_ms) {
     int i, j;
+    struct timeval tv;
+    long long start, end;
+    double elapsed_ms;
+	
+    gettimeofday(&tv, NULL);
+    start = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
 
     for (j = 0; j < dummy_load_calib * execution_time_ms; j++)
         for (i = 0; i < INNER_ITERATIONS; i++)
             __asm__ volatile ("nop");
+    gettimeofday(&tv, NULL);
+    end = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
+
+    elapsed_ms = (end - start) / MSEC_PER_SEC;
+    printf("Requested execution time: %d ms\n", execution_time_ms);
+    printf("Actual execution time: %.3f ms\n", elapsed_ms);
+
 }
 
 void calibrate() {
@@ -38,7 +51,7 @@ void calibrate() {
         gettimeofday(&tv, NULL);
         end_us = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
     
-        total_time += (end_us - start_us) / MSEC_PER_SEC;
+        total_time += (double)(end_us - start_us) / MSEC_PER_SEC;
     }
     dummy_load_calib = (int)(((double)dummy_load_calib * CALIB_TARGET_MS / 
                        (total_time / CALIB_ITERATIONS)) + 0.5);
@@ -56,13 +69,7 @@ void calibrate() {
 //    calibrate();
 //    gettimeofday(&tv, NULL);
 //    start = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
-//
-//	dummy_load(target_ms);
-//
-//	gettimeofday(&tv, NULL);
-//	end = (long long)tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
-//
-//    elapsed_ms = (end - start) / MSEC_PER_SEC;
-//    printf("Requested execution time: %.3f ms\n", (double)target_ms);
-//	printf("Actual execution time: %.3f ms\n", elapsed_ms);
+//	for(int i = 0; i < 100; i++){
+//		dummy_load(target_ms);
+//	}
 //}
