@@ -43,12 +43,12 @@ static long wait_until_next_period(void){
 
 int main(void) {
 
-	long long Cvals[5] = {1000e6, 100e6, 400e6, 50e6, 10e6};
-	long long Tvals[5] = {5000e6, 400e6, 500e6, 70e6, 10e6};
+	long long Cvals[5] = {10e6, 100e6, 35e6, 50e6, 10e6};
+	long long Tvals[5] = {50e6, 400e6, 200e6, 70e6, 10e6};
 	
 	calibrate();
 
-	for(int i = 0; i < 3; i++){
+	for(int i = 0; i < 5; i++){
 		pid_t pid = fork();
 		if(pid == 0){
 			struct timespec C = {.tv_nsec=Cvals[i], .tv_sec = 0};
@@ -70,15 +70,13 @@ int main(void) {
 			while(1){
 				struct timespec now;
 				clock_gettime(CLOCK_MONOTONIC, &now);
-				printf("PID:%d t=%lld.%09ld Starting Task, Task: %lldms, Period: %lldms\n", getpid(), (long long)now.tv_sec, now.tv_nsec, C_ms, T_ms);
+				//printf("PID:%d t=%lld.%09ld Starting Task, Task: %lldms, Period: %lldms\n", getpid(), (long long)now.tv_sec, now.tv_nsec, C_ms, T_ms);
 				dummy_load(C_ms);
-				printf("PID:%d dummy loaded\n", getpid());
 				long wret = wait_until_next_period();
 				if(wret < 0){
 					printf("wait_until_next_period broke\n");
 					exit(1);
 				}
-				printf("PID:%d waited until next period\n", getpid());
 			}
 
 			exit(0);

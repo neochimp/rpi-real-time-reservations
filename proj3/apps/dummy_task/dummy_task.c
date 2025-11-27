@@ -54,7 +54,7 @@ void calibrate() {
         total_time += (double)(end_us - start_us) / MSEC_PER_SEC;
     }
     dummy_load_calib = (int)(((double)dummy_load_calib * CALIB_TARGET_MS / 
-                       (total_time / CALIB_ITERATIONS)) + 0.5);
+                       (total_time / CALIB_ITERATIONS)) *0.995 + 0.5);
 	printf("[*] DUMMY LOAD CALIBRATED\n");
 }
 
