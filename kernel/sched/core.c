@@ -75,6 +75,7 @@
 #include <linux/compiler.h>
 #include <linux/frame.h>
 #include <linux/prefetch.h>
+#include <linux/math64.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -3394,6 +3395,21 @@ static void __sched notrace __schedule(bool preempt)
 	rq->clock_skip_update = 0;
 
 	if (likely(prev != next)) {
+        /* ################# CS596 PROJECT 3 CODE STARTS HERE #################### */
+        u64 now = ktime_get_ns(); //Get the current time
+
+        if (prev->rsv_active && prev->rsv_last_start_ns) { //Check if there is an active reservation and we can calculate how long it ran
+            u64 delta = now - prev->rsv_last_start_ns; //how many nanoseconds the task ran since the last context switch
+            prev->rsv_accumulated_ns += delta; //Add delta to the tracker of accumulated runtime
+        }
+	
+
+        // If the next has an active reservation, set its start time to the current time
+        if (next->rsv_active) {
+            next->rsv_last_start_ns = now;
+        }
+
+        /*################## CS596 PROJECT 3 CODE ENDS HERE ###################### */
 		rq->nr_switches++;
 		rq->curr = next;
 		++*switch_count;
