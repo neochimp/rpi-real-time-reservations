@@ -1,10 +1,35 @@
 Q1. What is the difference between concurrent execution and parallel execution?
 
+The difference between concurrent execution and parallel execution is that concurrent execution is when one cpu/core
+alternates between different tasks within the same time interval in order to make progress on both of them whereas parallel
+execution involves the usage of multiple cpus/cores to make progress on both of them at the same time. 
+In other words, concurrent execution is a design characteristic in which a single cpu/core context switches quickly to work on
+multiple tasks (although not at exactly the same time instance) whereas parallel execution is implemented through creating
+hardware such as multiple cpus/cores that are able to both work independently on different tasks at the same time instance.
 
 Q2. In 4.4, let's supose that a task has exceeded its budget (execution time of C per T). Explain the task's behavior afterwards.
 
+In 4.4, when a task exceeds its budget, it continues regular behavior without recognizing or acknowledging this issue or throwing any errors. 
+This is because, as of step 4.4, we had not implemented any way to track if a task had exceeded its budget. 
+
+Another thing to note, however, is that after implementing step 4.5, we do test for when a task exceeds its budget. 
+Every time that the accumulator updates, in the event that a task has exceeded its budget, we print how much its exceeded to the kernel.
 
 Q3. If a deadline of a periodic task is different with its period, how do you implement to support real-time
 
+If a periodic task's deadline was different from its period and we wanted to adjust our current version of the code to account for this,
+we would need to adjust to track both deadline and period. One way to approach this problem would be to implement another timer and callback function. 
+We would need one timer/callback function for the deadline and one for the period. The new deadline callback function would need to evaluate
+if the deadline has been missed. The period callback function would have need to rearm both of these timers.
 
 Q4. What issues have you faced for the project and how did you resolve them? (If there isn't any issue, please briefly describe how did you get to the solution.)
+
+A lot of the issues that we faced with this project were pretty similar to the issues we faced with project 2. These issues include a lack of experience
+working in the kernel, difficulty testing code given the time it takes to compile the kernel, and the fact that we only had one pi.
+
+In order to resolve the issue of our lack of experience, we spent a lot of time looking through online documentation and forum messages on StackOverflow.
+
+In order to resolve the issue of difficulty testing our code, we started implementing our code as modules that we could insert/remove without
+completely recompiling the kernel. This greatly reduced the time between tests of our code.
+
+In order to resolve the issue of only having one pi, we met up in person in order to share ideas and allow all of us access to the pi.
