@@ -1986,6 +1986,9 @@ struct task_struct {
 	bool rsv_period_elapsed;
     	u64 rsv_last_start_ns; // The last time that the task has been scheduled in (chosen as the next task to run)
 	u64 rsv_accumulated_ns; // The total amount of CPU time used so far for the current period (so we know how much more we need to do to reach C)
+
+	//spinlock for accumulator stuff
+	spinlock_t accumulator_lock;
 /* #################################### CS596 Project 3 Changes end here #################################*/
 //#endif
 /* CPU-specific state of this task */
