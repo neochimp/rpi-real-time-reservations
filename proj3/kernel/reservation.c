@@ -203,6 +203,11 @@ SYSCALL_DEFINE3(set_rsv,
         target_task->rsv_C = *C;
         target_task->rsv_T = *T;
         target_task->rsv_active = true;
+        target_task->rsv_accumulated_ns = 0;
+        target_task->rsv_last_start_ns = 0;
+        
+        //init spinlock for accumulated time
+        spin_lock_init(&target_task->accumulator_lock);
         
         pr_info("PID:%d: Successfully set task values C: %lld, T: %lld\n", pid, (long long)(target_task->rsv_C.tv_sec*NSEC_PER_SEC+target_task->rsv_C.tv_nsec), (long long)(target_task->rsv_T.tv_sec*NSEC_PER_SEC+target_task->rsv_T.tv_nsec));
 
@@ -285,7 +290,7 @@ SYSCALL_DEFINE0(wait_until_next_period){
 static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
         //get the task_struct by using the hrtimer
         struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
-        
+        u64 now;
         
         if(!task){
                 pr_info("rsv_timer_callback: task is NULL\n");
@@ -294,6 +299,17 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
 
         if(!task->rsv_active)
                 return HRTIMER_NORESTART;
+   
+   	now = ktime_get_ns();
+   	
+   	unsigned long flags;
+   	spin_lock_irqsave(&task->accumulator_lock, flags);
+   	
+   	if(task->rsv_last_start_ns){
+   		u64 delta = now - task->rsv_last_start_ns;
+   		task->rsv_accumulated_ns += delta;
+   		task->rsv_last_start_ns = now;
+   	}
 
         //4.5 accumulator
         u64 C_ns = timespec_to_ns(&task->rsv_C);
@@ -311,6 +327,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
         //reset accumulator for next task
         resetAccumulator(task);
 
+	spin_unlock_irqrestore(&task->accumulator_lock, flags);
 
         task->rsv_period_elapsed = true;
         wake_up_interruptible(&task->rsv_wq);
