@@ -407,9 +407,10 @@
 /* 395 */	CALL(sys_pkey_alloc)
 		CALL(sys_pkey_free)
 		/* CS596 Project 3 Starts Here */
-		CALL(sys_set_rsv)
+		CALL(sys_set_edf_task) //Adjusted for project 4
 		CALL(sys_cancel_rsv)
 		CALL(sys_wait_until_next_period)
+        CALL(sys_get_e2e_latency) //Added for project 4
 		/* CS596 Project 3 Ends Here */
 
 #ifndef syscalls_counted

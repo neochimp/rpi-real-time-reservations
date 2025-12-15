@@ -14,13 +14,14 @@
 #include <linux/math64.h>
 #include <linux/signal.h>
 #include <linux/syscalls.h>
+#include <linux/cpumask.h> //nr_cpu_ids
 
 //4.3 RT priority assignment
 #define MAX_RSV 50
  
 struct rsv_entry {
         struct task_struct *task;
-        u64 T_ns;
+        u64 T_ns; //I don't think we need this anymore but I'm going to leave it anyway in case I miss a reference to it somewhere
         bool used;
 };
 
@@ -49,65 +50,63 @@ struct task_struct *rsv_get_task_by_pid(pid_t pid) {
 
 
 //rsv table functions
-static void rsv_update_priorities(void){
-        u64 unique_periods[MAX_RSV];
-        int num_unique = 0;
-        int i, j;
+static void rsv_update_priorities(void) {
+    struct task_struct *edf_tasks[MAX_RSV];
+    int i, j, task_num;
+    int cpu;
 
-        //find all unique periods
-        for(i = 0; i < MAX_RSV; i++){
-                if(rsv_table[i].used){
-                        u64 T = rsv_table[i].T_ns;
-                        bool found = false;
-                        //look through unique periods to see if value is already there
-                        for(j = 0; j < num_unique; j++){
-                                if(unique_periods[j] == T){
-                                        found = true;
-                                        break;
-                                }
-                        }
-                        //if not found in unique_periods, add it and increment num_unique
-                        if(!found){
-                                unique_periods[num_unique++] = T;
-                        }
-                }
+    //Each cpu needs to be treated independently
+    for_each_online_cpu(cpu) { //I couldn't find much but this is the best I've got - Documentation: https://lwn.net/Articles/537570/
+        task_num = 0; //The current task
 
+        //Update edf_tasks so it accurately reflects all active tasks
+        for(i = 0; i < MAX_RSV; i++) {
+            struct task_struct *temp;
+
+            if(!rsv_table[i].used) { //Verify that the task is being used
+                continue;
+            }
+
+            temp = rsv_table[i].task; //Store the current task
+            if(!temp || !temp->rsv_active) { //Verify that the current task exists and is active
+                continue;
+            }
+            if(temp->rsv_cpu_id != cpu) { //Verify that rsv_cpu_id matches cpu
+                continue;
+            }
+
+            edf_tasks[task_num++] = temp; //set edf_tasks[taskNum] to temp and then increment taskNum
         }
-        //sort unique periods with insertion sort
-        for(i = 1; i < num_unique; i++){
-                u64 key = unique_periods[i];
-                j = i - 1;
-                while(j >= 0 && unique_periods[j] > key){
-                        unique_periods[j+1] = unique_periods[j];
-                        j--;
+        
+        //Sort edf_tasks by rsv_abs_deadline_ns (bubble sort)
+        for(i = 0; i < task_num - 1; i++) {
+            for(j = 0; j < task_num - 1 - i; j++) {
+                if(edf_tasks[j]->rsv_abs_deadline_ns > edf_tasks[j + 1]->rsv_abs_deadline_ns) {
+                    struct task_struct *temp = edf_tasks[j];
+                    edf_tasks[j] = edf_tasks[j + 1];
+                    edf_tasks[j + 1] = temp;
                 }
-                unique_periods[j+1] = key;
+            }
         }
+        
+        //Assign priorities
+        for(i = 0; i < task_num; i++) {
+            int prio = (MAX_RT_PRIO - 1) - i; //The earliest tasks in edf_tasks / the tasks with the earliest deadlines get the highest priorities (start from 99 and count down)
+            struct sched_param param = {0};
+            param.sched_priority = prio;
+            int ret;
 
-        //doing the priority updating
-        for(i = 0; i < num_unique; i++){
-                int prio = (MAX_RT_PRIO - 1) -i;
-                if(prio < 0)
-                        prio = 0;
+            ret = sched_setscheduler_nocheck(edf_tasks[i], SCHED_FIFO, &param);
 
-                for(j = 0; j < MAX_RSV; j++){                                                                                                                                             
-                        if(rsv_table[j].used &&                                                                                                                                           
-                                rsv_table[j].T_ns == unique_periods[i] &&                                                                                                                
-                                rsv_table[j].task){                                                                                                                                       
-                                                                                                                                                                                          
-                                struct sched_param param = {0};                                                                                                                           
-                                int ret;                                                                                                                                                  
-                                param.sched_priority = prio;                                                                                                                              
-                                ret = sched_setscheduler_nocheck(rsv_table[j].task, SCHED_FIFO, &param);                                                                                  
-                                if(ret){                                                                                                                                                  
-                                        pr_info("sched scheduler failed for pid%d, ret%d\n", rsv_table[j].task->pid, ret);                                                                
-                                }else{                                                                                                                                                    
-                                        pr_info("set pid=%d SCHED_FIFO rt_prio=%d", rsv_table[j].task->pid, prio);                                                                        
-                                }                                                                                                                                                         
-                        }                                                                                                                                                                 
-                }                                                                                                                                                                         
-        }                                                                                                                                                                                 
-}                                                                                                                                                                                                                                                                                                                                                                                  
+            if(ret) { //if return error
+                pr_info("sched scheduler failed for pid%d, ret%d\n", edf_tasks[i]->pid, ret);
+            }
+            else { //success
+                pr_info("set pid=%d SCHED_FIFO rt_prio=%d", edf_tasks[i]->pid, prio);
+            }
+        }
+    }
+}
 static void rsv_table_add(struct task_struct *curr_task, u64 T_ns){
         int i;
         for(i = 0; i < MAX_RSV; i++){ //find the first unused spot and insert there
@@ -120,7 +119,7 @@ static void rsv_table_add(struct task_struct *curr_task, u64 T_ns){
                         return;
                 }
         }
-} 
+}
 
 
 static void rsv_table_remove(struct task_struct *curr_task) {
@@ -130,6 +129,8 @@ static void rsv_table_remove(struct task_struct *curr_task) {
                         rsv_table[i].used = false;
                         rsv_table[i].task = NULL;
                         rsv_table[i].T_ns = 0;
+
+                        rsv_update_priorities();
                         return;
                 }
         }
@@ -154,10 +155,14 @@ static void resetAccumulator(struct task_struct *task){
 }
 
 
-SYSCALL_DEFINE3(set_rsv,
+SYSCALL_DEFINE7(set_edf_task,
                 pid_t, pid,
                 const struct timespec __user *, C,
-                const struct timespec __user *, T)
+                const struct timespec __user *, T,
+                const struct timespec __user *, D,
+                int, cpu_id,
+                int, chain_id,
+                int, chain_pos)
 {
         // current task struct, defined in linux/sched.h
         struct task_struct *target_task;        
@@ -168,18 +173,30 @@ SYSCALL_DEFINE3(set_rsv,
                 return -1;
         }
 
-        //check if C & T are valid user space addresses
-        if(!C || !T){
-                pr_info("PID:%d C and T fail\n", pid);
+        //check if C & T & D are valid user space addresses
+        if(!C || !T || !D){
+                pr_info("PID:%d C or T fail\n", pid);
                 return -1;
         }
 
         u64 C_ns = (u64)C->tv_sec * NSEC_PER_SEC + (u64)C->tv_nsec;
         u64 T_ns = (u64)T->tv_sec * NSEC_PER_SEC + (u64)T->tv_nsec;
+
+        /* PROJECT 4 CHANGES START HERE */
+        u64 now = ktime_get_ns();
+        u64 D_ns = (u64)D->tv_sec * NSEC_PER_SEC + (u64)D->tv_nsec;
+
+        if(cpu_id < 0 || cpu_id >= nr_cpu_ids) {
+            pr_info("set_edf_task: invalid cpu_id %d\n", cpu_id);
+            return -1;
+        }
         
-        //C and T are valid times
-        if(C_ns <= 0 || T_ns < C_ns){
-                pr_info("PID:%d C and T value fail\n", pid);
+        target_task->rsv_cpu_id = cpu_id;
+        /* PROJECT 4 CHANGES END HERE */
+        
+        //C, T, and D are valid times
+        if(C_ns <= 0 || D_ns <= 0 || D_ns < C_ns){
+                pr_info("PID:%d C or T value fail\n", pid);
                 return -1;
         }
 
@@ -205,6 +222,22 @@ SYSCALL_DEFINE3(set_rsv,
         target_task->rsv_active = true;
         target_task->rsv_accumulated_ns = 0;
         target_task->rsv_last_start_ns = 0;
+
+        /* PROJECT 4 CHANGES START HERE */
+        target_task->rsv_D = *D;
+        target_task->rsv_abs_deadline_ns = now + D_ns;
+
+        target_task->rsv_chain_id = chain_id;
+        target_task->rsv_chain_pos = chain_pos;
+
+        //create a cpu mask and use it to pin the target task to the cpu_id
+        //There's horrible documentation for this so I have zero confidence in the accuracy of the next four lines
+        //Also the instructions don't explicitly say to pin the task to the cpu passed in, so maybe we don't need this? I'm not sure
+        struct cpumask mask;
+        cpumask_clear(&mask);
+        cpumask_set_cpu(cpu_id, &mask);
+        set_cpus_allowed_ptr(target_task, &mask);
+        /* PROJECT 4 CHANGES END HERE */
         
         //init spinlock for accumulated time
         spin_lock_init(&target_task->accumulator_lock);
@@ -220,7 +253,6 @@ SYSCALL_DEFINE3(set_rsv,
         rsv_table_add(target_task, T_ns);
         spin_unlock_irqrestore(&rsv_lock, flags);
         
-        
         return 0; // success
 }
 
@@ -233,7 +265,7 @@ SYSCALL_DEFINE1(cancel_rsv, pid_t, pid){
         if(!target_task->rsv_active){
                 pr_info("cancel_rsv: No reservation on pid%d\n", pid);
         	return -1;
-	}
+	    }
 
         target_task->rsv_C.tv_sec = 0;
         target_task->rsv_C.tv_nsec = 0;
@@ -253,6 +285,16 @@ SYSCALL_DEFINE1(cancel_rsv, pid_t, pid){
         //part 4.5
         target_task->rsv_accumulated_ns = 0;
         target_task->rsv_last_start_ns = 0;
+
+        /* PROJECT 4 CHANGES START HERE */
+        target_task->rsv_D.tv_sec = 0;
+        target_task->rsv_D.tv_nsec = 0;
+
+        target_task->rsv_cpu_id = 0;
+        target_task->rsv_chain_id = 0;
+        target_task->rsv_chain_pos = 0;
+        target_task->rsv_abs_deadline_ns = 0;
+        /* PROJECT 4 CHANGES END HERE */
 
         unsigned long flags;
         spin_lock_irqsave(&rsv_lock, flags);
@@ -284,21 +326,29 @@ SYSCALL_DEFINE0(wait_until_next_period){
         return 0;
 }
 
+SYSCALL_DEFINE2(get_e2e_latency,
+                int, chain_id,
+                struct timespec __user *, latency_buf)
+{
+    //TODO: Implement this
+    return -1;
+}
+
 
 
 //hrtimer callback function
 static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
-        //get the task_struct by using the hrtimer
-        struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
-        u64 now;
-        
-        if(!task){
-                pr_info("rsv_timer_callback: task is NULL\n");
-                return HRTIMER_NORESTART;
-        }
+    //get the task_struct by using the hrtimer
+    struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
+    u64 now;
+    
+    if(!task){
+        pr_info("rsv_timer_callback: task is NULL\n");
+        return HRTIMER_NORESTART;
+    }
 
-        if(!task->rsv_active)
-                return HRTIMER_NORESTART;
+    if(!task->rsv_active)
+        return HRTIMER_NORESTART;
    
    	now = ktime_get_ns();
    	
@@ -311,28 +361,39 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
    		task->rsv_last_start_ns = now;
    	}
 
-        //4.5 accumulator
-        u64 C_ns = timespec_to_ns(&task->rsv_C);
-        u64 used = task->rsv_accumulated_ns;
+    //4.5 accumulator
+    u64 C_ns = timespec_to_ns(&task->rsv_C);
+    u64 used = task->rsv_accumulated_ns;
+    
+    if(C_ns > 0 && used > C_ns){
+        u64 util_pct = div64_u64(used * 1000, C_ns);
+        u64 mod = do_div(util_pct, 10);
+        printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
         
-        if(C_ns > 0 && used > C_ns){
-                u64 util_pct = div64_u64(used * 1000, C_ns);
-                u64 mod = do_div(util_pct, 10);
-                printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
-                
-                //4.6 overrun notification
-                send_sig(SIGUSR1, task, 0);
-        }
+        //4.6 overrun notification
+        send_sig(SIGUSR1, task, 0);
+    }
 
-        //reset accumulator for next task
-        resetAccumulator(task);
+    //reset accumulator for next task
+    resetAccumulator(task);
+
+    /* PROJECT 4 CHANGES START HERE */
+    //Update rsv_abs_deadline_ns and all priorities (because changing a task's absolute deadline also changes its priority)
+    u64 D_ns = (u64)task->rsv_D.tv_sec * NSEC_PER_SEC + (u64)task->rsv_D.tv_nsec;
+    task->rsv_abs_deadline_ns = now + D_ns;
+
+    unsigned long flags2;
+    spin_lock_irqsave(&rsv_lock, flags2);
+    rsv_update_priorities();
+    spin_lock_irqrestore(&rsv_lock, flags2);
+    /* PROJECT 4 CHANGES START HERE */
 
 	spin_unlock_irqrestore(&task->accumulator_lock, flags);
 
-        task->rsv_period_elapsed = true;
-        wake_up_interruptible(&task->rsv_wq);
+    task->rsv_period_elapsed = true;
+    wake_up_interruptible(&task->rsv_wq);
 
-        //rearm
-        hrtimer_forward_now(timer, timespec_to_ktime(task->rsv_T));
-        return HRTIMER_RESTART;
+    //rearm
+    hrtimer_forward_now(timer, timespec_to_ktime(task->rsv_T));
+    return HRTIMER_RESTART;
 }

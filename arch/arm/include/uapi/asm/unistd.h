@@ -420,13 +420,15 @@
 #define __NR_copy_file_range		(__NR_SYSCALL_BASE+391)
 #define __NR_preadv2			(__NR_SYSCALL_BASE+392)
 #define __NR_pwritev2			(__NR_SYSCALL_BASE+393)
-#define __NR_pkey_mprotect		(__NR_SYSCALL_BASE+394)
+#define __NR_pkey_mprotect		(__NR_SYSCALL_BASE+394include/linux
+/syscalls.h)
 #define __NR_pkey_alloc			(__NR_SYSCALL_BASE+395)
 #define __NR_pkey_free			(__NR_SYSCALL_BASE+396)
 /* ############################# CS596 Project 3 Code Starts Here ########################## */
-#define __NR_set_rsv			(__NR_SYSCALL_BASE+397)
+#define __NR_set_edf_task			(__NR_SYSCALL_BASE+397) //Adjusted for project 4
 #define __NR_cancel_rsv			(__NR_SYSCALL_BASE+398)
 #define __NR_wait_until_next_period	(__NR_SYSCALL_BASE+399)
+#define __NR_get_e2e_latency (__NR_SYSCALL_BASE+400) //Added for project 4
 /* ############################# CS596 Project 3 Code Ends Here ############################ */
 /*
  * The following SWIs are ARM private.

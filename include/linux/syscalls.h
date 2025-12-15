@@ -903,4 +903,17 @@ asmlinkage long sys_pkey_mprotect(unsigned long start, size_t len,
 asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
 asmlinkage long sys_pkey_free(int pkey);
 
+/* CS596 PROJECT 4 CHANGES START HERE */
+asmlinkage long sys_set_edf_task(pid_t pid, 
+                                 struct timespec __user *C, 
+                                 struct timespec __user *T, 
+                                 struct timespec __user *D, 
+                                 int cpu_id, 
+                                 int chain_id, 
+                                 int chain_pos);
+asmlinkage long sys_cancel_rsv(pid_t pid);
+asmlinkage long sys_wait_until_next_period(void);
+asmlinkage long sys_get_e2e_latency(int chain_id, 
+                                    struct timespec __user *latency_buf);
+/* CS596 PROJECT 4 CHANGES END HERE */
 #endif

@@ -1976,20 +1976,28 @@ struct task_struct {
 #endif
 //#ifdef CONFIG_PROJ3_RSV
 /* #################################### CS596 Project 3 Changes begin here ############################## */
-    	bool rsv_active; // Whether or not the current task has a reservation (true if the task currently has an active reservation)
-    	struct timespec rsv_C; // The amount of computation time that a task needs per period
-    	struct timespec rsv_T; // The period for a task
+    bool rsv_active; // Whether or not the current task has a reservation (true if the task currently has an active reservation)
+    struct timespec rsv_C; // The amount of computation time that a task needs per period
+    struct timespec rsv_T; // The period for a task
 
-    	struct hrtimer rsv_timer; //Timer for task
+    struct hrtimer rsv_timer; //Timer for task
 
 	wait_queue_head_t rsv_wq;
 	bool rsv_period_elapsed;
-    	u64 rsv_last_start_ns; // The last time that the task has been scheduled in (chosen as the next task to run)
+    u64 rsv_last_start_ns; // The last time that the task has been scheduled in (chosen as the next task to run)
 	u64 rsv_accumulated_ns; // The total amount of CPU time used so far for the current period (so we know how much more we need to do to reach C)
 
 	//spinlock for accumulator stuff
 	spinlock_t accumulator_lock;
-/* #################################### CS596 Project 3 Changes end here #################################*/
+/* #################################### CS596 Project 3 ends here, Project 4 begins here #################*/
+    //New arguments for the syscall that we need to store
+    struct timespec rsv_D; //The deadline for a task
+    int rsv_cpu_id; //Which CPU the task is pinned to
+    int rsv_chain_id; //Chain identifier for 4.3
+    int rsv_chain_pos; //Position in chain for 4.3
+
+    u64 rsv_abs_deadline_ns; //Absolute deadline of the task in ns
+/* #################################### CS596 Project 4 Changes end here #################################*/
 //#endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
