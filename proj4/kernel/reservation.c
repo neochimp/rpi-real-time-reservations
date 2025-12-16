@@ -232,11 +232,11 @@ SYSCALL_DEFINE7(set_edf_task,
 
         //create a cpu mask and use it to pin the target task to the cpu_id
         //There's horrible documentation for this so I have zero confidence in the accuracy of the next four lines
-        //Also the instructions don't explicitly say to pin the task to the cpu passed in, so maybe we don't need this? I'm not sure
-        struct cpumask mask;
-        cpumask_clear(&mask);
-        cpumask_set_cpu(cpu_id, &mask);
-        set_cpus_allowed_ptr(target_task, &mask);
+        //Can't tell if this needs to be done here for 4.1 or in user space in 4.2 so I'm commenting it out for now
+        //struct cpumask mask;
+        //cpumask_clear(&mask);
+        //cpumask_set_cpu(cpu_id, &mask);
+        //set_cpus_allowed_ptr(target_task, &mask);
         /* PROJECT 4 CHANGES END HERE */
         
         //init spinlock for accumulated time
