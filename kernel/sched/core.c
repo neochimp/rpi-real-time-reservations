@@ -3411,9 +3411,9 @@ static void __sched notrace __schedule(bool preempt)
         // If the next has an active reservation, set its start time to the current time
         if (next->rsv_active) {
         	unsigned long flag;
-        	spin_lock_irqsave(&next->accumulator_lock, flags);
+        	spin_lock_irqsave(&next->accumulator_lock, flag);
             next->rsv_last_start_ns = now;
-            spin_unlock_irqrestore(&next->accumulator_lock, flags);
+            spin_unlock_irqrestore(&next->accumulator_lock, flag);
         }
 
         /*################## CS596 PROJECT 3 CODE ENDS HERE ###################### */
