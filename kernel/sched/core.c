@@ -3415,7 +3415,7 @@ static void __sched notrace __schedule(bool preempt)
         if (next->rsv_active) {
         	spin_lock_irqsave(&next->accumulator_lock, flags);
             next->rsv_last_start_ns = now;
-            spin_unlock_irqrestore(&next->accumulator_lock, flags);
+            spin_unlock_irqrestore(&next->accumulator_lock, flag);
         }
 
         /*################## CS596 PROJECT 3 CODE ENDS HERE ###################### */

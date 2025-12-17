@@ -917,7 +917,7 @@ export mod_sign_cmd
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ proj3/kernel/
+core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ proj4/kernel/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
@@ -1708,3 +1708,7 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+clean:
+	find . -type f | xargs touch
+	rm -rf $(OBJS)

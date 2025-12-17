@@ -48,6 +48,15 @@ struct task_struct *rsv_get_task_by_pid(pid_t pid) {
 	return task;
 };
 
+struct edf_task_struct {
+	struct timespec __user * C;
+	struct timespec __user * T;
+	struct timespec __user * D;
+	int cpu_id;
+	int chain_id;
+	int chain_pos;
+};
+
 
 //rsv table functions
 static void rsv_update_priorities(void) {
@@ -155,17 +164,19 @@ static void resetAccumulator(struct task_struct *task){
 }
 
 
-SYSCALL_DEFINE7(set_edf_task,
-                pid_t, pid,
-                const struct timespec __user *, C,
-                const struct timespec __user *, T,
-                const struct timespec __user *, D,
-                int, cpu_id,
-                int, chain_id,
-                int, chain_pos)
+SYSCALL_DEFINE2(set_edf_task,
+                pid_t, pid, struct edf_task_struct __user*, edf_info)
 {
+	//breaking down the edf_task_struct.
+        struct task_struct *target_task;       
+	struct timespec* C = edf_info->C;
+	struct timespec* T = edf_info->T;
+	struct timespec* D = edf_info->D;
+	int cpu_id = edf_info->cpu_id;
+	int chain_id = edf_info->chain_id;
+	int chain_pos = edf_info->chain_pos;
+
         // current task struct, defined in linux/sched.h
-        struct task_struct *target_task;        
         //find the target task_struct using the pid
         target_task = rsv_get_task_by_pid(pid);
         if(!target_task){
@@ -385,7 +396,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
     unsigned long flags2;
     spin_lock_irqsave(&rsv_lock, flags2);
     rsv_update_priorities();
-    spin_lock_irqrestore(&rsv_lock, flags2);
+    spin_unlock_irqrestore(&rsv_lock, flags2);
     /* PROJECT 4 CHANGES START HERE */
 
 	spin_unlock_irqrestore(&task->accumulator_lock, flags);
