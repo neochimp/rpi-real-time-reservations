@@ -12,6 +12,7 @@ all: loader
 loader: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
+loader.o: loader.h ../dummy_task/dummy_task.h
 ../dummy_task/dummy_task.o: ../dummy_task/dummy_task.h
 
 clean:

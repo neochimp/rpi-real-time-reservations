@@ -9,22 +9,11 @@
 #include <sys/wait.h>
 #include <signal.h> //for kill()?
 
-#include "dummy_task.h"
+#include "../dummy_task/dummy_task.h"
+#include "loader.h"
 
 #define NUM_CORES 2
 #define NUM_TASKS 9 //There are 9 lines in taskset.txt
-
-#ifndef __NR_set_edf_task
-#define __NR_set_edf_task 397
-#endif
-
-#ifndef __NR_cancel_rsv
-#define __NR_cancel_rsv 398
-#endif
-
-#ifndef __NR_wait_until_next_period
-#define __NR_wait_until_next_period 399
-#endif
 
 struct timespec ms_to_timespec(int ms) {
     struct timespec temp;
@@ -33,7 +22,14 @@ struct timespec ms_to_timespec(int ms) {
     return temp;
 }
 
-static long set_edf_task(pid_t pid, const struct timespec *C, const struct timespec *T, const struct timespec *D, int cpu_id, int chain_id, int chain_pos) {
+static long set_edf_task(pid_t pid,
+                         const struct timespec *C,
+                         const struct timespec *T,
+                         const struct timespec *D,
+                         int cpu_id,
+                         int chain_id,
+                         int chain_pos)
+{
     return syscall(__NR_set_edf_task, pid, C, T, D, cpu_id, chain_id, chain_pos);
 }
 
@@ -45,26 +41,15 @@ static long wait_until_next_period(void) {
     return syscall(__NR_wait_until_next_period);
 }
 
-typedef struct {
-    int C_ms;
-    int T_ms;
-    int D_ms;
-    int chain_id;
-    int chain_pos;
-    double util;
-    int assigned_core;
-    int id; //for being able to tell which 
-} Task;
-
-void swap_tasks(Task *task_one, Task *task_two) { //Helper for sorting
+void swap_tasks(Task *task_one, Task *task_two) {
     Task temp = *task_one;
     *task_one = *task_two;
     *task_two = temp;
 }
 
-int sort_tasks(Task tasks[]) { //bubble sort in descending order
-    for(int i = 0; i < NUM_TASKS - i - 1; i++) {
-        for(int j = 0; j < NUM_TASKS; j++) {
+void sort_tasks(Task tasks[], int num_tasks) {
+    for(int i = 0; i < num_tasks - i - 1; i++) {
+        for(int j = 0; j < num_tasks; j++) {
             if(tasks[j].util < tasks[j + 1].util) { //task one's util > task two's util
                 swap_tasks(&tasks[j], &tasks[j+1]);
             }
@@ -101,11 +86,11 @@ int main(int argc, char *argv[]) {
     }
     fclose(file);
 
-    sort_tasks(tasks); //sort tasks by util (to be used later for first fit decreasing)
+    sort_tasks(tasks, rows_read); //sort tasks by util (to be used later for first fit decreasing)
 
     double cpu_util[NUM_CORES] = {0.0, 0.0};
 
-    for(int i = 0; i < NUM_TASKS; i++) { //select assigned_core using first fit decreasing algorithm
+    for(int i = 0; i < rows_read; i++) { //select assigned_core using first fit decreasing algorithm
         if(cpu_util[0] + tasks[i].util <= 1.0) { //If it fits in cpu 0, set assigned_core to 0
             cpu_util[0] += tasks[i].util;
             tasks[i].assigned_core = 0;
@@ -121,8 +106,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for(int i = 0; i < NUM_TASKS; i++) { //Print which core each task is assigned to in order of id
-        for(int j = 0; j < NUM_TASKS; j++) {
+    for(int i = 0; i < rows_read; i++) { //Print which core each task is assigned to in order of id
+        for(int j = 0; j < rows_read; j++) {
             if(tasks[j].id == i) {
                 printf("Task %d assigned to core %d\n", tasks[j].id, tasks[j].assigned_core);
                 continue;
@@ -133,13 +118,12 @@ int main(int argc, char *argv[]) {
     calibrate();
     pid_t pid_list[NUM_TASKS];
 
-    for(int i = 0; i < NUM_TASKS; i++) {
+    for(int i = 0; i < rows_read; i++) {
         pid_t pid = fork();
         if(pid < 0) {
             printf("Fork failed\n");
             return 1;
-        }
-        else if(pid == 0) { //child process
+        } else if(pid == 0) { //child process
             //Set the task to the desired core | Documentation: https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html
             cpu_set_t mask;
             CPU_ZERO(&mask);
@@ -154,7 +138,10 @@ int main(int argc, char *argv[]) {
             struct timespec T = ms_to_timespec(tasks[i].T_ms);
             struct timespec D = ms_to_timespec(tasks[i].D_ms);
 
-            if(set_edf_task(getpid(), &C, &T, &D, tasks[i].assigned_core, tasks[i].chain_id, tasks[i].chain_pos) < 0) {
+            if(set_edf_task(getpid(), &C, &T, &D, 
+                            tasks[i].assigned_core,
+                            tasks[i].chain_id,
+                            tasks[i].chain_pos) < 0) {
                 printf("set_edf_task failed\n");
                 return 1;
             }
@@ -177,7 +164,7 @@ int main(int argc, char *argv[]) {
 
     sleep(120); //wait 2 minutes
 
-    for(int i = 0; i < NUM_TASKS; i++) { //cancel all tasks
+    for(int i = 0; i < rows_read; i++) { //cancel all tasks
         cancel_rsv(pid_list[i]);
         kill(pid_list[i], SIGKILL);
     }
