@@ -1,0 +1,26 @@
+Q1. What is the difference between partitioned and global multi-processor scheduling? What are the
+pros and cons of each?
+
+Partitioned multi-processor scheduling statically binds each task to a single processor. Because each task is predictably bound, it is an ideal candidate for hard real-time systems that need guaranteed deadlines and simple analysis. One major drawback is that it can easily lead to processor imbalance if the tasks aren't distributed in a near-optimal way.
+
+Global multi-processor scheduling holds a global queue from which any processor can run a task. This improves the overall load balancing issues from partitioned scheduling, but introduces higher runtime overhead from context switching and migration.
+
+
+Q2. Explain your task partitioning strategy. List which tasks you assigned to Core 0 and Core 1, and
+show that the utilization on each core is <= 1.0
+
+
+
+Q3. Please measure the overhead of your EDF scheduling implementation in the Kernel space? Was it
+acceptable?
+
+
+
+Q4. How did you implement the e2e latency measurement? Specifically, where in the kernel are the
+start and end times captured, and how did you handle synchronization between cores?
+
+
+
+Q5. What issues did you face for this project and how did you resolve them?
+
+
