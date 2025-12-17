@@ -53,15 +53,26 @@ struct task_struct *rsv_get_task_by_pid(pid_t pid)
     return task;
 };
 
-struct edf_task_struct
-{
-    struct timespec __user *C;
-    struct timespec __user *T;
-    struct timespec __user *D;
-    int cpu_id;
-    int chain_id;
-    int chain_pos;
+struct edf_task_struct {
+	const struct timespec __user * C;
+	const struct timespec __user * T;
+	const struct timespec __user * D;
+	int cpu_id;
+	int chain_id;
+	int chain_pos;
 };
+
+//helper function for printing out the current list of tasks.
+static void printTasks(void){
+        int i;
+        pr_info("**Current tasks scheduled:\n");
+        for(i = 0; i < MAX_RSV; i++){
+                if(rsv_table[i].used && rsv_table[i].task){
+                        struct task_struct *p = rsv_table[i].task;
+                        pr_info("   PID: %d, D: %lld, Priority: %d\n", p->pid, (long long)(rsv_table[i].task->rsv_D.tv_sec*NSEC_PER_SEC+rsv_table[i].task->rsv_D.tv_nsec), p->rt_priority);
+                }
+        }
+}
 
 // rsv table functions
 static void rsv_update_priorities(void)
@@ -145,6 +156,7 @@ static void rsv_table_add(struct task_struct *curr_task, u64 T_ns)
             rsv_table[i].T_ns = T_ns;
 
             rsv_update_priorities();
+            printTasks();
             return;
         }
     }
@@ -162,30 +174,18 @@ static void rsv_table_remove(struct task_struct *curr_task)
             rsv_table[i].T_ns = 0;
 
             rsv_update_priorities();
+            printTasks();
             return;
         }
     }
     // TODO: condition for if not found
 }
 
-// helper function for printing out the current list of tasks.
-static void printTasks(void)
-{
-    int i;
-    pr_info("**Current tasks scheduled:\n");
-    for (i = 0; i < MAX_RSV; i++)
-    {
-        if (rsv_table[i].used && rsv_table[i].task)
-        {
-            struct task_struct *p = rsv_table[i].task;
-            pr_info("   PID: %d, T: %lld, Priority: %d\n", p->pid, rsv_table[i].T_ns, p->rt_priority);
-        }
-    }
-}
-// helper function for clarity
-static void resetAccumulator(struct task_struct *task)
-{
-    task->rsv_accumulated_ns = 0;
+
+//helper function for clarity
+static void resetAccumulator(struct task_struct *task){
+        task->rsv_accumulated_ns = 0;
+
 }
 
 SYSCALL_DEFINE2(set_edf_task,
@@ -239,63 +239,55 @@ SYSCALL_DEFINE2(set_edf_task,
         return -1;
     }
 
-    // target already has an active reservation
-    if (target_task->rsv_active)
-    {
-        pr_info("target already has active reservation\n");
-        return -1;
-    }
+        //part 4.4 conditions used to wake the timer for wait_until_next_period();
+        if(!target_task->rsv_active){
+                init_waitqueue_head(&target_task->rsv_wq); //declare rsv_wq
+                target_task->rsv_period_elapsed = false;
+                hrtimer_init(&target_task->rsv_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED); //define the timer
+                target_task->rsv_timer.function = rsv_timer_callback; //set the callback function to our custom function
+    		unsigned long flags;
+        	spin_lock_irqsave(&rsv_lock, flags);
+		rsv_update_priorities();
+        	spin_unlock_irqrestore(&rsv_lock, flags);
+        }else{
+                hrtimer_cancel(&target_task->rsv_timer);
+        }
 
-    // part 4.4 conditions used to wake the timer for wait_until_next_period();
-    if (!target_task->rsv_active)
-    {
-        init_waitqueue_head(&target_task->rsv_wq); // declare rsv_wq
-        target_task->rsv_period_elapsed = false;
-        hrtimer_init(&target_task->rsv_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED); // define the timer
-        target_task->rsv_timer.function = rsv_timer_callback;                            // set the callback function to our custom function
-    }
-    else
-    {
-        hrtimer_cancel(&target_task->rsv_timer);
-    }
+        //store C, T into target_task's task_struct
+        target_task->rsv_C = *C;
+        target_task->rsv_T = *T;
+        target_task->rsv_active = true;
+        target_task->rsv_accumulated_ns = 0;
+        target_task->rsv_last_start_ns = 0;
 
-    // store C, T into target_task's task_struct
-    target_task->rsv_C = *C;
-    target_task->rsv_T = *T;
-    target_task->rsv_active = true;
-    target_task->rsv_accumulated_ns = 0;
-    target_task->rsv_last_start_ns = 0;
+        /* PROJECT 4 CHANGES START HERE */
+        target_task->rsv_D = *D;
+        target_task->rsv_abs_deadline_ns = now + D_ns;
 
-    /* PROJECT 4 CHANGES START HERE */
-    target_task->rsv_D = *D;
-    target_task->rsv_abs_deadline_ns = now + D_ns;
+        target_task->rsv_chain_id = chain_id;
+        target_task->rsv_chain_pos = chain_pos;
 
-    target_task->rsv_chain_id = chain_id;
-    target_task->rsv_chain_pos = chain_pos;
+        //create a cpu mask and use it to pin the target task to the cpu_id
+        //There's horrible documentation for this so I have zero confidence in the accuracy of the next four lines
+        //Can't tell if this needs to be done here for 4.1 or in user space in 4.2 so I'm commenting it out for now
+        //struct cpumask mask;
+        //cpumask_clear(&mask);
+        //cpumask_set_cpu(cpu_id, &mask);
+        //set_cpus_allowed_ptr(target_task, &mask);
+        /* PROJECT 4 CHANGES END HERE */
+        
+        pr_info("PID:%d: Successfully set task values C: %lld, T: %lld, D: %lld\n", pid, (long long)(target_task->rsv_C.tv_sec*NSEC_PER_SEC+target_task->rsv_C.tv_nsec), (long long)(target_task->rsv_T.tv_sec*NSEC_PER_SEC+target_task->rsv_T.tv_nsec), (long long)(target_task->rsv_D.tv_sec*NSEC_PER_SEC+target_task->rsv_D.tv_nsec));
 
-    // create a cpu mask and use it to pin the target task to the cpu_id
-    // There's horrible documentation for this so I have zero confidence in the accuracy of the next four lines
-    // Can't tell if this needs to be done here for 4.1 or in user space in 4.2 so I'm commenting it out for now
-    // struct cpumask mask;
-    // cpumask_clear(&mask);
-    // cpumask_set_cpu(cpu_id, &mask);
-    // set_cpus_allowed_ptr(target_task, &mask);
-    /* PROJECT 4 CHANGES END HERE */
 
-    // init spinlock for accumulated time
-    spin_lock_init(&target_task->accumulator_lock);
+        hrtimer_start(&target_task->rsv_timer, ns_to_ktime(T_ns), HRTIMER_MODE_REL_PINNED); //start the timer
 
-    pr_info("PID:%d: Successfully set task values C: %lld, T: %lld\n", pid, (long long)(target_task->rsv_C.tv_sec * NSEC_PER_SEC + target_task->rsv_C.tv_nsec), (long long)(target_task->rsv_T.tv_sec * NSEC_PER_SEC + target_task->rsv_T.tv_nsec));
-
-    hrtimer_start(&target_task->rsv_timer, ns_to_ktime(T_ns), HRTIMER_MODE_REL_PINNED); // start the timer
-
-    // lock critical section
-    unsigned long flags;
-    spin_lock_irqsave(&rsv_lock, flags);
-    rsv_table_add(target_task, T_ns);
-    spin_unlock_irqrestore(&rsv_lock, flags);
-
-    return 0; // success
+        //lock critical section
+        unsigned long flags;
+        spin_lock_irqsave(&rsv_lock, flags);
+        rsv_table_add(target_task, T_ns);
+        spin_unlock_irqrestore(&rsv_lock, flags);
+        
+        return 0; // success
 }
 
 SYSCALL_DEFINE1(cancel_rsv, pid_t, pid)
@@ -399,15 +391,12 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer)
         return HRTIMER_NORESTART;
 
     now = ktime_get_ns();
-
-    unsigned long flags;
-    spin_lock_irqsave(&task->accumulator_lock, flags);
-
-    if (task->rsv_last_start_ns)
-    {
-        u64 delta = now - task->rsv_last_start_ns;
-        task->rsv_accumulated_ns += delta;
-        task->rsv_last_start_ns = now;
+   	
+    
+    if(task->rsv_last_start_ns) {
+   	u64 delta = now - task->rsv_last_start_ns;
+   	task->rsv_accumulated_ns += delta;
+   	task->rsv_last_start_ns = now;
     }
 
     // 4.5 accumulator
@@ -432,13 +421,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer)
     u64 D_ns = (u64)task->rsv_D.tv_sec * NSEC_PER_SEC + (u64)task->rsv_D.tv_nsec;
     task->rsv_abs_deadline_ns = now + D_ns;
 
-    unsigned long flags2;
-    spin_lock_irqsave(&rsv_lock, flags2);
-    rsv_update_priorities();
-    spin_unlock_irqrestore(&rsv_lock, flags2);
-    /* PROJECT 4 CHANGES START HERE */
-
-    spin_unlock_irqrestore(&task->accumulator_lock, flags);
+        /* PROJECT 4 CHANGES START HERE */
 
     task->rsv_period_elapsed = true;
     wake_up_interruptible(&task->rsv_wq);
