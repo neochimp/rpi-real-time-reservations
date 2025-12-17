@@ -5,12 +5,12 @@
 #define MSEC_PER_SEC 1000.0
 
 #define INNER_ITERATIONS 1000 // how many times our "nop" instruction is ran
-#define DEFAULT_CALIB    200 // initial guess for calib
+#define DEFAULT_CALIB 200     // initial guess for calib
 
-#define CALIB_WARMUP_MS   200 // each CPU warmup burst
-#define CALIB_WARMUP_RUNS 3   // how many warmups
-#define CALIB_TARGET_MS   100 // each measured run target
-#define CALIB_ITERATIONS  15  // how many measured runs
+#define CALIB_WARMUP_MS 200 // each CPU warmup burst
+#define CALIB_WARMUP_RUNS 3 // how many warmups
+#define CALIB_TARGET_MS 100 // each measured run target
+#define CALIB_ITERATIONS 15 // how many measured runs
 
 // global calibration variable
 static int dummy_load_calib = DEFAULT_CALIB;
