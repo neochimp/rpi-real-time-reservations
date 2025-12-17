@@ -11,20 +11,20 @@ MNT_ROOT="mnt/root"
 JOBS="$(nproc)"
 
 # === Setup mounts ===
-#mkdir -p "$MNT_BOOT" "$MNT_ROOT"
+mkdir -p "$MNT_BOOT" "$MNT_ROOT"
 
 echo "[*] Copying kernel config..."
-#cp "$CONFIG_FILE" .config
+cp "$CONFIG_FILE" .config
 
 echo "[*] Running menuconfig (interactive)..."
-#make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" menuconfig
+make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" menuconfig
 
 echo "[*] Building kernel, modules, and DTBs..."
-#make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" zImage modules dtbs -j"$JOBS"
+make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" zImage modules dtbs -j"$JOBS"
 
 echo "[*] Mounting partitions..."
-#sudo mount "${DEVICE}1" "$MNT_BOOT"
-#sudo mount "${DEVICE}2" "$MNT_ROOT"
+sudo mount "${DEVICE}1" "$MNT_BOOT"
+sudo mount "${DEVICE}2" "$MNT_ROOT"
 
 echo "[*] Installing modules to rootfs..."
 sudo env PATH="$PATH" make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" \
