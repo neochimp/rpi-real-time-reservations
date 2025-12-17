@@ -44,8 +44,8 @@ void swap_tasks(Task *task_one, Task *task_two) {
 }
 
 void sort_tasks(Task tasks[], int num_tasks) {
-    for(int i = 0; i < num_tasks - i - 1; i++) {
-        for(int j = 0; j < num_tasks; j++) {
+    for(int i = 0; i < num_tasks - 1; i++) {
+        for(int j = 0; j < num_tasks - i - 1; j++) {
             if(tasks[j].util < tasks[j + 1].util) { //task one's util > task two's util
                 swap_tasks(&tasks[j], &tasks[j+1]);
             }
