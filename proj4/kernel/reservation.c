@@ -69,9 +69,34 @@ static void printTasks(void){
         for(i = 0; i < MAX_RSV; i++){
                 if(rsv_table[i].used && rsv_table[i].task){
                         struct task_struct *p = rsv_table[i].task;
-                        pr_info("   PID: %d, D: %lld, Priority: %d\n", p->pid, (long long)(rsv_table[i].task->rsv_D.tv_sec*NSEC_PER_SEC+rsv_table[i].task->rsv_D.tv_nsec), p->rt_priority);
+                        pr_info("   PID: %d, CPU: %d, D: %lld, Priority: %d\n", p->pid, p->rsv_cpu_id, (long long)(p->rsv_D.tv_sec*NSEC_PER_SEC+p->rsv_D.tv_nsec), p->rt_priority);
                 }
         }
+}
+static void printTasksByCPU(void){
+        int i;
+        pr_info("**Current tasks scheduled:\n");
+	pr_info("[*]CPU: 0\n");
+        for(i = 0; i < MAX_RSV; i++){
+                if(rsv_table[i].used && rsv_table[i].task){
+                        struct task_struct *p = rsv_table[i].task;
+			if(p->rsv_cpu_id == 0){
+				pr_info("   PID: %d, D: %lld, Priority: %d\n", p->pid, (long long)(p->rsv_D.tv_sec*NSEC_PER_SEC+p->rsv_D.tv_nsec), p->rt_priority);
+                
+			}
+		}
+        }
+	pr_info("[*]CPU: 1\n");
+	for(i = 0; i < MAX_RSV; i++){
+                if(rsv_table[i].used && rsv_table[i].task){
+                        struct task_struct *p = rsv_table[i].task;
+			if(p->rsv_cpu_id == 1){
+				pr_info("   PID: %d, D: %lld, Priority: %d\n", p->pid, (long long)(p->rsv_D.tv_sec*NSEC_PER_SEC+p->rsv_D.tv_nsec), p->rt_priority);
+                
+			}
+		}
+        }
+	pr_info("\n");
 }
 
 // rsv table functions
@@ -139,7 +164,7 @@ static void rsv_update_priorities(void)
             }
             else
             { // success
-                pr_info("set pid=%d SCHED_FIFO rt_prio=%d", edf_tasks[i]->pid, prio);
+                //pr_info("set pid=%d SCHED_FIFO rt_prio=%d", edf_tasks[i]->pid, prio);
             }
         }
     }
@@ -156,7 +181,7 @@ static void rsv_table_add(struct task_struct *curr_task, u64 T_ns)
             rsv_table[i].T_ns = T_ns;
 
             rsv_update_priorities();
-            printTasks();
+            printTasksByCPU();
             return;
         }
     }
@@ -174,7 +199,7 @@ static void rsv_table_remove(struct task_struct *curr_task)
             rsv_table[i].T_ns = 0;
 
             rsv_update_priorities();
-            printTasks();
+            printTasksByCPU();
             return;
         }
     }
