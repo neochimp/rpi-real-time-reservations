@@ -12,9 +12,6 @@
 #include "../dummy_task/dummy_task.h"
 #include "loader.h"
 
-#define NUM_CORES 2
-#define NUM_TASKS 9 //There are 9 lines in taskset.txt
-
 struct timespec ms_to_timespec(int ms) {
     struct timespec temp;
     temp.tv_sec = ms / 1000;
@@ -28,8 +25,7 @@ static long set_edf_task(pid_t pid,
                          const struct timespec *D,
                          int cpu_id,
                          int chain_id,
-                         int chain_pos)
-{
+                         int chain_pos){
     return syscall(__NR_set_edf_task, pid, C, T, D, cpu_id, chain_id, chain_pos);
 }
 

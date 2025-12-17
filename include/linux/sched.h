@@ -1974,7 +1974,6 @@ struct task_struct {
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
 #endif
-//#ifdef CONFIG_PROJ3_RSV
 /* #################################### CS596 Project 3 Changes begin here ############################## */
     bool rsv_active; // Whether or not the current task has a reservation (true if the task currently has an active reservation)
     struct timespec rsv_C; // The amount of computation time that a task needs per period
@@ -1998,7 +1997,6 @@ struct task_struct {
 
     u64 rsv_abs_deadline_ns; //Absolute deadline of the task in ns
 /* #################################### CS596 Project 4 Changes end here #################################*/
-//#endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
