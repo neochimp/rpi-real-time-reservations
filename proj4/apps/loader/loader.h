@@ -19,7 +19,8 @@
 #define __NR_wait_until_next_period 399
 #endif
 
-typedef struct {
+typedef struct
+{
     int C_ms;
     int T_ms;
     int D_ms;
