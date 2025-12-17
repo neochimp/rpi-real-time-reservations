@@ -53,20 +53,10 @@ static long wait_until_next_period(void) {
     return syscall(__NR_wait_until_next_period);
 }
 
-void swap_tasks(Task *task_one, Task *task_two) {
-    Task temp = *task_one;
-    *task_one = *task_two;
-    *task_two = temp;
-}
-
-void sort_tasks(Task tasks[], int num_tasks) {
-    for(int i = 0; i < num_tasks - 1; i++) {
-        for(int j = 0; j < num_tasks - i - 1; j++) {
-            if(tasks[j].util < tasks[j + 1].util) { //task one's util > task two's util
-                swap_tasks(&tasks[j], &tasks[j+1]);
-            }
-        }
-    }
+void compare_task_util(const Task *task_one, const Task *task_two) {
+    if (task_one->util < task_two->util) return 1;
+    if (task_one->util > task_two->util) return -1;
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -98,7 +88,7 @@ int main(int argc, char *argv[]) {
     }
     fclose(file);
 
-    sort_tasks(tasks, rows_read); //sort tasks by util (to be used later for first fit decreasing)
+    qsort(tasks, rows_read, sizeof(Task), compare_task_util); //sort tasks by util (to be used later for first fit decreasing)
 
     double cpu_util[NUM_CORES] = {0.0, 0.0};
 
