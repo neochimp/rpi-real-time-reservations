@@ -49,9 +49,9 @@ struct task_struct *rsv_get_task_by_pid(pid_t pid) {
 };
 
 struct edf_task_struct {
-	struct timespec __user * C;
-	struct timespec __user * T;
-	struct timespec __user * D;
+	const struct timespec __user * C;
+	const struct timespec __user * T;
+	const struct timespec __user * D;
 	int cpu_id;
 	int chain_id;
 	int chain_pos;

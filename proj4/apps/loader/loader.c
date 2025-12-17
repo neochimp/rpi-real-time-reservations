@@ -17,7 +17,16 @@ struct timespec ms_to_timespec(int ms) {
     temp.tv_sec = ms / 1000;
     temp.tv_nsec = (ms % 1000) * 1000000;
     return temp;
-}
+};
+
+struct edf_task_struct {
+	const struct timespec *C;
+	const struct timespec *T;
+	const struct timespec *D;
+	int cpu_id;
+	int chain_id;
+	int chain_pos;
+};
 
 static long set_edf_task(pid_t pid,
                          const struct timespec *C,
@@ -26,7 +35,14 @@ static long set_edf_task(pid_t pid,
                          int cpu_id,
                          int chain_id,
                          int chain_pos){
-    return syscall(__NR_set_edf_task, pid, C, T, D, cpu_id, chain_id, chain_pos);
+	struct edf_task_struct newTask;
+	newTask.C = C;
+	newTask.T = T;
+	newTask.D = D;
+	newTask.cpu_id = cpu_id;
+	newTask.chain_id = chain_id;
+	newTask.chain_pos = chain_pos;
+    return syscall(__NR_set_edf_task, pid, &newTask);
 }
 
 static long cancel_rsv(pid_t pid) {
