@@ -43,7 +43,6 @@ void compare_task_util(const Task *task_one, const Task *task_two) {
     return 0;
 }
 
-
 int main(int argc, char *argv[]) {
     //Scan taskset.txt -> store in input
     if(argc != 1) {

@@ -273,10 +273,11 @@ SYSCALL_DEFINE1(cancel_rsv, pid_t, pid){
 
         if(!target_task)
                 return -1;
+                
         if(!target_task->rsv_active){
                 pr_info("cancel_rsv: No reservation on pid%d\n", pid);
         	return -1;
-	    }
+        }
 
         target_task->rsv_C.tv_sec = 0;
         target_task->rsv_C.tv_nsec = 0;
@@ -353,7 +354,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
     struct task_struct *task = container_of(timer, struct task_struct, rsv_timer);
     u64 now;
     
-    if(!task){
+    if(!task) {
         pr_info("rsv_timer_callback: task is NULL\n");
         return HRTIMER_NORESTART;
     }
@@ -361,22 +362,22 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
     if(!task->rsv_active)
         return HRTIMER_NORESTART;
    
-   	now = ktime_get_ns();
+    now = ktime_get_ns();
    	
-   	unsigned long flags;
-   	spin_lock_irqsave(&task->accumulator_lock, flags);
+    unsigned long flags;
+    spin_lock_irqsave(&task->accumulator_lock, flags);
    	
-   	if(task->rsv_last_start_ns){
-   		u64 delta = now - task->rsv_last_start_ns;
-   		task->rsv_accumulated_ns += delta;
-   		task->rsv_last_start_ns = now;
-   	}
+    if(task->rsv_last_start_ns) {
+   	u64 delta = now - task->rsv_last_start_ns;
+   	task->rsv_accumulated_ns += delta;
+   	task->rsv_last_start_ns = now;
+    }
 
     //4.5 accumulator
     u64 C_ns = timespec_to_ns(&task->rsv_C);
     u64 used = task->rsv_accumulated_ns;
     
-    if(C_ns > 0 && used > C_ns){
+    if(C_ns > 0 && used > C_ns) {
         u64 util_pct = div64_u64(used * 1000, C_ns);
         u64 mod = do_div(util_pct, 10);
         printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
@@ -399,7 +400,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer) {
     spin_unlock_irqrestore(&rsv_lock, flags2);
     /* PROJECT 4 CHANGES START HERE */
 
-	spin_unlock_irqrestore(&task->accumulator_lock, flags);
+    spin_unlock_irqrestore(&task->accumulator_lock, flags);
 
     task->rsv_period_elapsed = true;
     wake_up_interruptible(&task->rsv_wq);
