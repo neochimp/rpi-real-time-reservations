@@ -3396,12 +3396,15 @@ static void __sched notrace __schedule(bool preempt)
 
 	if (likely(prev != next)) {
         /* ################# CS596 PROJECT 3 CODE STARTS HERE #################### */
-        u64 now = ktime_get_ns(); //Get the current time
+        u64 now;
+		u64 delta;
+		unsigned long flags;
+
+		now = ktime_get_ns();
 
         if (prev->rsv_active && prev->rsv_last_start_ns) { //Check if there is an active reservation and we can calculate how long it ran
-            unsigned long flags;
             spin_lock_irqsave(&prev->accumulator_lock, flags);
-            u64 delta = now - prev->rsv_last_start_ns; //how many nanoseconds the task ran since the last context switch
+            delta = now - prev->rsv_last_start_ns; //how many nanoseconds the task ran since the last context switch
             prev->rsv_accumulated_ns += delta; //Add delta to the tracker of accumulated runtime
             prev->rsv_last_start_ns = 0;
             spin_unlock_irqrestore(&prev->accumulator_lock, flags);
@@ -3410,7 +3413,6 @@ static void __sched notrace __schedule(bool preempt)
 
         // If the next has an active reservation, set its start time to the current time
         if (next->rsv_active) {
-        	unsigned long flag;
         	spin_lock_irqsave(&next->accumulator_lock, flags);
             next->rsv_last_start_ns = now;
             spin_unlock_irqrestore(&next->accumulator_lock, flags);
