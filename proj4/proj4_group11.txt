@@ -1,3 +1,12 @@
+EC 4.4: How to improve end-to-end latency of chains?
+
+Currently, the EDF scheduling approach we use is chain-agnostic, in that it only cares about individual deadlines. If we wanted to improve the end-to-end latency of chains, we could make it chain-aware by taking into account `chain_id` and `chain_pos` whe nassigning priorities. We could:
+    1. favor earlier stages so that data flows through the pipeline faster
+    2. partition end-to-end deadlines across chains rather than giving each task independent deadlines
+Making these changes would reduce e2e latency because, suppose we have task chain T with tasks t1->t2->t3. If t2 cannot make progress until t1 produces its output, if the scheduler runs t2 first (which is possible given the arbitrary deadlines), t2 would immediately block or spin waiting for data from t1, meaning CPU resources are guaranteed to be wasted. With these changes, we know t1 will always run before t2, so t2 will never have the chance to block the CPU and waste resources.
+
+Writeup 4.5:
+
 Q1. What is the difference between partitioned and global multi-processor scheduling? What are the
 pros and cons of each?
 
