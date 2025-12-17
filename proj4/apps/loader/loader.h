@@ -31,12 +31,9 @@ typedef struct {
 } Task;
 
 // Convert milliseconds to timespec
-struct timespec ms_to_timespec(int ms);
+struct timespec ms_to_timespec(int);
 
 // Sorting helper
-void swap_tasks(Task *task_one, Task *task_two);
-
-// Bubble sort tasks in descending order of utilization
-void sort_tasks(Task tasks[], int num_tasks);
+int compare_task_util(const Task, const Task);
 
 #endif // LOADER_H
