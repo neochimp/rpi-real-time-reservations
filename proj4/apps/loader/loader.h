@@ -19,6 +19,11 @@
 #define __NR_wait_until_next_period 399
 #endif
 
+#ifndef __NR_get_e2e_latency
+#define __NR_get_e2e_latency 400
+#endif
+
+
 typedef struct
 {
     int C_ms;
@@ -35,6 +40,6 @@ typedef struct
 struct timespec ms_to_timespec(int);
 
 // Sorting helper
-int compare_task_util(const Task, const Task);
+int compare_task_util(const Task*, const Task*);
 
 #endif // LOADER_H

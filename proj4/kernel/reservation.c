@@ -111,8 +111,8 @@ static void update_task_chain(struct task_struct *task){
 	task->chain_info = current_chain;
 	//initialize our min and max values if this is our first task in the chain
 	if(task->rsv_chain_pos == 0){
-	    task->chain_info->min_latency_ns = 0;
-	    task->chain_info->max_latency_ns = ULLONG_MAX;
+	    task->chain_info->min_latency_ns = ULLONG_MAX;
+	    task->chain_info->max_latency_ns = 0;
 	    spin_lock_init(&task->chain_info->lock);
 	}
 	current_chain->length++;
@@ -363,7 +363,7 @@ SYSCALL_DEFINE1(cancel_rsv, pid_t, pid)
     wake_up_interruptible(&target_task->rsv_wq); // wake up wait_until_next_period()
     target_task->rsv_period_elapsed = false;     // clear the condition used by wait_until_next_period()
 
-    pr_info("cancel_rsv: Reservation for pid%d cancelled", pid);
+    //pr_info("cancel_rsv: Reservation for pid%d cancelled", pid);
 
     // part 4.5
     target_task->rsv_accumulated_ns = 0;
@@ -372,11 +372,31 @@ SYSCALL_DEFINE1(cancel_rsv, pid_t, pid)
     /* PROJECT 4 CHANGES START HERE */
     target_task->rsv_D.tv_sec = 0;
     target_task->rsv_D.tv_nsec = 0;
+   
+
+    u64 max_ns = target_task->chain_info->max_latency_ns;
+    u64 min_ns = target_task->chain_info->min_latency_ns;
+    u64 avg_ns = div64_u64(target_task->chain_info->cumulative_time, target_task->chain_info->total_runs); 
+
+    u64 max_ms_x100 = div64_u64(max_ns, 10000);
+    u64 min_ms_x100 = div64_u64(min_ns, 10000);
+    u64 avg_ms_x100 = div64_u64(avg_ns, 10000);
+
+    u32 max_frac = do_div(max_ms_x100, 100);
+    u32 min_frac = do_div(min_ms_x100, 100);
+    u32 avg_frac = do_div(avg_ms_x100, 100);
+
+    pr_info("Maximum latency of chain %d: %llu.%02u ms\n", target_task->rsv_chain_id, max_ms_x100, max_frac);
+    pr_info("Minimum latency of chain %d: %llu.%02u ms\n", target_task->rsv_chain_id, min_ms_x100, min_frac);
+    pr_info("Average latency of chain %d: %llu.%02u ms\n", target_task->rsv_chain_id, avg_ms_x100, min_frac);
+
 
     target_task->rsv_cpu_id = 0;
     target_task->rsv_chain_id = 0;
     target_task->rsv_chain_pos = 0;
     target_task->rsv_abs_deadline_ns = 0;
+    
+    
     /* PROJECT 4 CHANGES END HERE */
 
     unsigned long flags;
@@ -408,7 +428,7 @@ SYSCALL_DEFINE0(wait_until_next_period)
 
     if(chain->next_position == current->rsv_chain_pos){			//if our current chain position is the next task in our chain
     	
-    	pr_info("Task at chain: %d position: %d was counted\n", current->rsv_chain_id, current->rsv_chain_pos);
+    	//pr_info("Task at chain: %d position: %d was counted\n", current->rsv_chain_id, current->rsv_chain_pos);
 	chain->next_position++;
     }
 
@@ -453,8 +473,22 @@ SYSCALL_DEFINE2(get_e2e_latency,
                 int, chain_id,
                 struct timespec __user *, latency_buf)
 {
-    // TODO: Implement this
-    return -1;
+    u64 ns;
+    u32 rem;
+    struct timespec ts;
+	
+    if (chain_id < 0 || chain_id >= MAX_CHAINS){
+        return -1;
+    }
+    ns = chains[chain_id].last_latency_ns;
+    rem = do_div(ns, 1000000000ULL);
+
+    ts.tv_sec = (time_t)ns;
+    ts.tv_nsec = (long)rem;
+
+    if(copy_to_user(latency_buf, &ts, sizeof(ts))) return -1;
+
+    return 0;
 }
 
 // hrtimer callback function
@@ -490,7 +524,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer)
     {
         u64 util_pct = div64_u64(used * 1000, C_ns);
         u64 mod = do_div(util_pct, 10);
-        //printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
+        printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
 
         // 4.6 overrun notification
         send_sig(SIGUSR1, task, 0);

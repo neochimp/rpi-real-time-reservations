@@ -56,7 +56,10 @@ static long wait_until_next_period(void)
     return syscall(__NR_wait_until_next_period);
 }
 
-void compare_task_util(const Task *task_one, const Task *task_two)
+static long get_e2e_latency(int chain_id, struct timespec* latency_buf){
+    return syscall(__NR_get_e2e_latency, chain_id, latency_buf);
+}
+int compare_task_util(const Task *task_one, const Task *task_two)
 {
     if (task_one->util < task_two->util)
         return 1;
@@ -65,8 +68,29 @@ void compare_task_util(const Task *task_one, const Task *task_two)
     return 0;
 }
 
+void print_timespec(struct timespec ts){
+    printf("timespec: %ld.%09ld\n", ts.tv_sec, ts.tv_nsec);
+}
+
+static void usr1_handler(int signo, siginfo_t *info, void *ucontext){
+	(void)ucontext;
+	//do whatever you want when you get the error
+}
+
 int main(int argc, char *argv[])
 {
+    //SIGUSR1 error stuff
+    struct sigaction sa = {0};
+    sa.sa_sigaction = usr1_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+
+    if(sigaction(SIGUSR1, &sa, NULL) == -1){
+    	perror("sigaction");
+	return 1;
+    }
+
+
     // Scan taskset.txt -> store in input
     if (argc != 1)
     {
@@ -192,11 +216,21 @@ int main(int argc, char *argv[])
 
     sleep(120); // wait 2 minutes
 
+  
     for (int i = 0; i < rows_read; i++)
     { // cancel all tasks
-        cancel_rsv(pid_list[i]);
+	cancel_rsv(pid_list[i]);
         kill(pid_list[i], SIGKILL);
     }
+
+  //run e2e latency on each chain for testing
+    struct timespec* latency_buf[2];
+    for(int i = 0; i < 3; i++){
+    	get_e2e_latency(i, latency_buf[i]);
+	print_timespec(*latency_buf[i]);
+    }
+
+
 
     return 0;
 }
