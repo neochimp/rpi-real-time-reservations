@@ -224,10 +224,10 @@ int main(int argc, char *argv[])
     }
 
   //run e2e latency on each chain for testing
-    struct timespec* latency_buf[2];
+    struct timespec latency_buf[2];
     for(int i = 0; i < 3; i++){
-    	get_e2e_latency(i, latency_buf[i]);
-	print_timespec(*latency_buf[i]);
+    	get_e2e_latency(i, &latency_buf[i]);
+	print_timespec(latency_buf[i]);
     }
 
 
