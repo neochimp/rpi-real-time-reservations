@@ -142,12 +142,15 @@ struct hrtimer;
 //struct used for tracking end to end latency chains (Assignment 4.3)
 struct chain_struct {
 	u32 chain_id;		//id of chain
+	u32 next_position;	//position of next task to be run
 	u32 length; 		//number of tasks in the chain
 	u64 cumulative_time;	//add the time every completion of chain, used for avg
 	u64 total_runs;		//every time chain is completed, used for avg
 	u64 start_time;		//time stamp at start of chain
 	u64 end_time;		//time stamp at end of chain
-	u64 last_latency_ms;	//end_time - start_time converted from ns to ms
+	u64 last_latency_ns;	//end_time - start_time
+	u64 min_latency_ns;
+	u64 max_latency_ns;
 };
 /* ############################### CS596 Project 3&4 Changes end here ########################### */
 

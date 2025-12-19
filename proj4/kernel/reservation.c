@@ -109,8 +109,12 @@ static void update_task_chain(struct task_struct *task){
 		current_chain->chain_id = task->rsv_chain_id;
 	}
 	task->chain_info = current_chain;
+	//initialize our min and max values if this is our first task in the chain
+	if(task->rsv_chain_pos == 0){
+	    task->chain_info->min_latency_ns = 0;
+	    task->chain_info->max_latency_ns = ULLONG_MAX;
+	}
 	current_chain->length++;
-	pr_info("-PID: %d assigned to chain: %d, struct addr: %p", task->pid, current_chain->chain_id, (void *)current_chain);
 }
 
 // rsv table functions
@@ -390,6 +394,33 @@ SYSCALL_DEFINE0(wait_until_next_period)
         pr_info("mod_wait_until_next_period: no active reservation");
         return -1;
     }
+
+    struct chain_struct *chain = current->chain_info;
+    pr_info("Task at chain: %d position: %d just finished\n", current->rsv_chain_id, current->rsv_chain_pos);
+    //4.3 If we get to this point then a task has just finished, check if it is the last in the chain and save the current time if it is. Then do the calculations we need before clearing the information for the next run of the chain
+    if(chain->next_position == current->rsv_chain_pos){			//if our current chain position is the next task in our chain
+    	chain->next_position++;
+    }
+
+    if(chain->next_position == chain->length){				//if we just finished the last task
+    	chain->end_time = ktime_get_ns;					//get the current time
+	chain->last_latency_ns = chain->start_time - chain->end_time;	//calculate latency and save as most recent
+	chain->cumulative_time += chain->last_latency_ns;		//add cumulative time for avg 
+	chain->total_runs++;						//increment counter for avg
+	
+	//update min and max if needed.
+	if(chain->last_latency_ns < chain->min_latency_ns){
+	    chain->min_latency_ns = chain->last_latency_ns;
+	}	
+	if(chain->last_latency_ns > chain->max_latency_ns){
+	    chain->max_latency_ns = chain->last_latency_ns;
+	}
+	
+	//reset chain tracking value now that a full chain has been completed.
+	chain->next_position = 0;
+	pr_info("\nChain: %d completed with latency of: %lluns\n\n", chain->chain_id, chain->last_latency_ns);
+    }
+
 
     current->rsv_period_elapsed = false;
 

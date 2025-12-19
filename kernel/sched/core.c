@@ -3400,36 +3400,44 @@ static void __sched notrace __schedule(bool preempt)
 	rq->clock_skip_update = 0;
 
 	if (likely(prev != next)) {
-        /* ################# CS596 PROJECT 3 and 4 CODE STARTS HERE #################### */
+        	/* ################# CS596 PROJECT 3 CODE STARTS HERE #################### */
         	u64 now;
 		u64 delta;
 		unsigned long flags;
 
 		now = ktime_get_ns();
 
-        if (prev->rsv_active && prev->rsv_last_start_ns) { //Check if there is an active reservation and we can calculate how long it ran
-            spin_lock_irqsave(&prev->accumulator_lock, flags);
-            delta = now - prev->rsv_last_start_ns; //how many nanoseconds the task ran since the last context switch
-            prev->rsv_accumulated_ns += delta; //Add delta to the tracker of accumulated runtime
-            prev->rsv_last_start_ns = 0;
-            spin_unlock_irqrestore(&prev->accumulator_lock, flags);
-        }
-	
+                if (prev->rsv_active && prev->rsv_last_start_ns) { //Check if there is an active reservation and we can calculate how long it ran
+                    spin_lock_irqsave(&prev->accumulator_lock, flags);
+                    delta = now - prev->rsv_last_start_ns; //how many nanoseconds the task ran since the last context switch
+                    prev->rsv_accumulated_ns += delta; //Add delta to the tracker of accumulated runtime
+                    prev->rsv_last_start_ns = 0;
+                    spin_unlock_irqrestore(&prev->accumulator_lock, flags);
+                }
+        	
+        
+                // If the next has an active reservation, set its start time to the current time
+                if (next->rsv_active) {
+                	spin_lock_irqsave(&next->accumulator_lock, flags);
+                    	next->rsv_last_start_ns = now;
+                    	spin_unlock_irqrestore(&next->accumulator_lock, flags);
+                }
+        
+                /*################## CS596 PROJECT 3 CODE ENDS AND 4 STARTS HERE ###################### */
+		struct chain_struct *chain = prev->chain_info;
+		//if we are due to record a new start
+		if(prev->rsv_chain_pos == 0 && chain->next_position == 0){
+			chain->start_time = now;
+		}
 
-        // If the next has an active reservation, set its start time to the current time
-        if (next->rsv_active) {
-        	spin_lock_irqsave(&next->accumulator_lock, flags);
-            next->rsv_last_start_ns = now;
-            spin_unlock_irqrestore(&next->accumulator_lock, flags);
-        }
-
-        /*################## CS596 PROJECT 3 CODE ENDS HERE ###################### */
+        	/* ################# CS596 PROJECT 4 CODE ENDS HERE ###################### */
+        		
 		rq->nr_switches++;
-		rq->curr = next;
-		++*switch_count;
-
-		trace_sched_switch(preempt, prev, next);
-		rq = context_switch(rq, prev, next, cookie); /* unlocks the rq */
+        	rq->curr = next;
+        	++*switch_count;
+        
+        	trace_sched_switch(preempt, prev, next);
+        	rq = context_switch(rq, prev, next, cookie); /* unlocks the rq */
 	} else {
 		lockdep_unpin_lock(&rq->lock, cookie);
 		raw_spin_unlock_irq(&rq->lock);
