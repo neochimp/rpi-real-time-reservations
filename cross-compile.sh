@@ -35,7 +35,7 @@ sudo env PATH="$PATH" make ARCH=arm CROSS_COMPILE="$CROSS_COMPILE" \
 echo "[*] Backing up existing kernel on boot partition..."
 if [ -f "$MNT_BOOT/$KERNEL_NAME.img" ]; then
     sudo cp "$MNT_BOOT/$KERNEL_NAME.img" \
-            "$MNT_BOOT/$KERNEL_NAME-backup-$(date +%Y%m%d%H%M%S).img"
+            "$MNT_BOOT/$KERNEL_NAME-backup.img"
 fi
 
 echo "[*] Copying new kernel image..."

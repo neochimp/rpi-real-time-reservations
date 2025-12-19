@@ -18,6 +18,7 @@
 
 // 4.3 RT priority assignment
 #define MAX_RSV 50
+#define MAX_CHAINS 5
 
 struct rsv_entry
 {
@@ -52,6 +53,8 @@ struct task_struct *rsv_get_task_by_pid(pid_t pid)
     }
     return task;
 };
+//Project4 array of chain_structs, position in array directly corresponds to chain_id. Tasks with the same chain_id share the same chain_struct
+struct chain_struct chains[MAX_CHAINS];
 
 struct edf_task_struct {
 	const struct timespec __user * C;
@@ -97,6 +100,17 @@ static void printTasksByCPU(void){
 		}
         }
 	pr_info("\n");
+}
+
+//assigning chain information to task, run only when a new task is added.
+static void update_task_chain(struct task_struct *task){
+	struct chain_struct *current_chain = &chains[task->rsv_chain_id];
+	if(task->rsv_chain_id != 0 && current_chain->chain_id != task->rsv_chain_id){
+		current_chain->chain_id = task->rsv_chain_id;
+	}
+	task->chain_info = current_chain;
+	current_chain->length++;
+	pr_info("-PID: %d assigned to chain: %d, struct addr: %p", task->pid, current_chain->chain_id, (void *)current_chain);
 }
 
 // rsv table functions
@@ -312,6 +326,9 @@ SYSCALL_DEFINE2(set_edf_task,
         rsv_table_add(target_task, T_ns);
         spin_unlock_irqrestore(&rsv_lock, flags);
         
+	//4.3 chain stuff
+	update_task_chain(target_task);
+
         return 0; // success
 }
 

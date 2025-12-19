@@ -3339,6 +3339,11 @@ static void __sched notrace __schedule(bool preempt)
 	struct rq *rq;
 	int cpu;
 
+        /* ################# CS596 PROJECT 4 CODE STARTS HERE #################### */
+	
+
+        /*################## CS596 PROJECT 4 CODE ENDS HERE ###################### */
+
 	cpu = smp_processor_id();
 	rq = cpu_rq(cpu);
 	prev = rq->curr;
@@ -3395,8 +3400,8 @@ static void __sched notrace __schedule(bool preempt)
 	rq->clock_skip_update = 0;
 
 	if (likely(prev != next)) {
-        /* ################# CS596 PROJECT 3 CODE STARTS HERE #################### */
-        u64 now;
+        /* ################# CS596 PROJECT 3 and 4 CODE STARTS HERE #################### */
+        	u64 now;
 		u64 delta;
 		unsigned long flags;
 
