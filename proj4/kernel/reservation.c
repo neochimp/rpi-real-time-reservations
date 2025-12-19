@@ -113,6 +113,7 @@ static void update_task_chain(struct task_struct *task){
 	if(task->rsv_chain_pos == 0){
 	    task->chain_info->min_latency_ns = 0;
 	    task->chain_info->max_latency_ns = ULLONG_MAX;
+	    spin_lock_init(&task->chain_info->lock);
 	}
 	current_chain->length++;
 }
@@ -199,7 +200,7 @@ static void rsv_table_add(struct task_struct *curr_task, u64 T_ns)
             rsv_table[i].T_ns = T_ns;
 
             rsv_update_priorities();
-            printTasksByCPU();
+            //printTasksByCPU();
             return;
         }
     }
@@ -217,7 +218,7 @@ static void rsv_table_remove(struct task_struct *curr_task)
             rsv_table[i].T_ns = 0;
 
             rsv_update_priorities();
-            printTasksByCPU();
+            //printTasksByCPU();
             return;
         }
     }
@@ -394,17 +395,26 @@ SYSCALL_DEFINE0(wait_until_next_period)
         pr_info("mod_wait_until_next_period: no active reservation");
         return -1;
     }
-
+    
     struct chain_struct *chain = current->chain_info;
-    pr_info("Task at chain: %d position: %d just finished\n", current->rsv_chain_id, current->rsv_chain_pos);
+    unsigned long flags;
+    u64 now;
+
+    if(!chain) return;
+    now = ktime_get_ns();
     //4.3 If we get to this point then a task has just finished, check if it is the last in the chain and save the current time if it is. Then do the calculations we need before clearing the information for the next run of the chain
+    
+    spin_lock_irqsave(&chain->lock, flags);
+
     if(chain->next_position == current->rsv_chain_pos){			//if our current chain position is the next task in our chain
-    	chain->next_position++;
+    	
+    	pr_info("Task at chain: %d position: %d was counted\n", current->rsv_chain_id, current->rsv_chain_pos);
+	chain->next_position++;
     }
 
     if(chain->next_position == chain->length){				//if we just finished the last task
-    	chain->end_time = ktime_get_ns;					//get the current time
-	chain->last_latency_ns = chain->start_time - chain->end_time;	//calculate latency and save as most recent
+    	chain->end_time = now;						//get the current time
+	chain->last_latency_ns = chain->end_time - chain->start_time;	//calculate latency and save as most recent
 	chain->cumulative_time += chain->last_latency_ns;		//add cumulative time for avg 
 	chain->total_runs++;						//increment counter for avg
 	
@@ -420,7 +430,7 @@ SYSCALL_DEFINE0(wait_until_next_period)
 	chain->next_position = 0;
 	pr_info("\nChain: %d completed with latency of: %lluns\n\n", chain->chain_id, chain->last_latency_ns);
     }
-
+    spin_unlock_irqrestore(&chain->lock, flags);
 
     current->rsv_period_elapsed = false;
 
@@ -480,7 +490,7 @@ static enum hrtimer_restart rsv_timer_callback(struct hrtimer *timer)
     {
         u64 util_pct = div64_u64(used * 1000, C_ns);
         u64 mod = do_div(util_pct, 10);
-        printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
+        //printk(KERN_INFO "Task %d: budget overrun (util: %llu.%llu%%)\n", task->pid, util_pct, mod);
 
         // 4.6 overrun notification
         send_sig(SIGUSR1, task, 0);

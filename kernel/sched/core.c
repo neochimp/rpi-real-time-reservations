@@ -3424,12 +3424,13 @@ static void __sched notrace __schedule(bool preempt)
                 }
         
                 /*################## CS596 PROJECT 3 CODE ENDS AND 4 STARTS HERE ###################### */
-		struct chain_struct *chain = prev->chain_info;
-		//if we are due to record a new start
-		if(prev->rsv_chain_pos == 0 && chain->next_position == 0){
-			chain->start_time = now;
+		if(prev->chain_info){
+			struct chain_struct *chain = prev->chain_info;
+			//if we are due to record a new start
+			if(chain && prev->rsv_chain_pos == 0 && chain->next_position == 0){
+				chain->start_time = now;
+			}
 		}
-
         	/* ################# CS596 PROJECT 4 CODE ENDS HERE ###################### */
         		
 		rq->nr_switches++;

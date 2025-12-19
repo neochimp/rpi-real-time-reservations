@@ -141,6 +141,7 @@ struct hrtimer;
 //project 4 changes here
 //struct used for tracking end to end latency chains (Assignment 4.3)
 struct chain_struct {
+	spinlock_t lock;
 	u32 chain_id;		//id of chain
 	u32 next_position;	//position of next task to be run
 	u32 length; 		//number of tasks in the chain
