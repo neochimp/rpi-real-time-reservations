@@ -50,12 +50,22 @@ Task 1: 12 200 200 0 1 | UTIL: 0.06
 Q3. Please measure the overhead of your EDF scheduling implementation in the Kernel space? Was it
 acceptable?
 
+We were uncertain about how we could approach this question, but one way we thought of was comparing the bytes necessary to implement EDF scheduling (finding how many of each data structure was used and then calculating how much space it would take up in memory to implement all of these data structures). We used the following assumptions for our calculations.
 
+Pointers: 8 bytes.
+Integers: 4 bytes.
+u64 / unsigned long long: 8 bytes.
+booleans: 1 byte
+struct timespec: 16 bytes (8 bytes tv_sec + 8 bytes tv_nsec).
+struct hrtimer: 64 bytes
+wait_queue_head_t: 24 bytes (Spinlock + Linked List Head).
+
+Our baseline storage (flat amount) was 1204 bytes for EDF scheduling. This actually aligned 1 to 1 with our RM scheduling which also ended up having a baseline storage of 1204 bytes. The part where it differed the most, however, was in our per-task storage. While RM scheduling only took us 148 bytes per task, EDF scheduling took us 176 bytes per task. These additional bytes came from an additional timespec struct (to hold deadline), one u64 variable for absolute deadline, and three integers for cpu_id, chain_id, and chain_pos. These changes amounted to a 36 byte difference per task, or roughly an 18.9% increase in storage overhead per task. Although this is a non-negligable difference, in our opinion this difference is reasonable given the extra features that we had to implement, and so we would consider it acceptable.
 
 Q4. How did you implement the e2e latency measurement? Specifically, where in the kernel are the
 start and end times captured, and how did you handle synchronization between cores?
-The start time of the first task of the chain is captured in the kernel/sched/core.c, when a new task is entered, if the chain has just been restarted and we are just started the first task of the chain, the current time is recorded. The end times are recorded in proj4/kernel/reservation.c; specifically, in the wait_until_next_period syscall right after we check if there is an active reservation. This was chosen because we know that this should only be called right after a task is completed but before we've waited until the period to end. The synchronization between cores and tasks within the chain is handled with a new "chain_struct" which holds essential chain information like the number of tasks, the next task which is able to be run after completion of the current task, max latency, min latency, etc. The task_struct has a chain_struct pointer which points to a dedicated struct for each unique chain_id. This chain_struct is shared with all of the tasks belonging to the same chain so that they can read and write information regarding their respective chains from different cores and processes. Each  cain_struct also has its own spinlock in order to protect the shared information.
 
+The start time of the first task of the chain is captured in the kernel/sched/core.c, when a new task is entered, if the chain has just been restarted and we are just started the first task of the chain, the current time is recorded. The end times are recorded in proj4/kernel/reservation.c; specifically, in the wait_until_next_period syscall right after we check if there is an active reservation. This was chosen because we know that this should only be called right after a task is completed but before we've waited until the period to end. The synchronization between cores and tasks within the chain is handled with a new "chain_struct" which holds essential chain information like the number of tasks, the next task which is able to be run after completion of the current task, max latency, min latency, etc. The task_struct has a chain_struct pointer which points to a dedicated struct for each unique chain_id. This chain_struct is shared with all of the tasks belonging to the same chain so that they can read and write information regarding their respective chains from different cores and processes. Each  cain_struct also has its own spinlock in order to protect the shared information.
 
 Q5. What issues did you face for this project and how did you resolve them?
 
