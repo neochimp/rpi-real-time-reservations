@@ -1,3 +1,8 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/dbvp16aO)
-[![Open in Codespaces](https://classroom.github.com/assets/launch-codespace-2972f46106e565e64193e422d61a12cf1da4916b45550586e14ef0a7c637dd04.svg)](https://classroom.github.com/open-in-codespaces?assignment_repo_id=20417696)
-# CS596-rpi-kernel
+# Real Time Task Reservations in the RPI Kernel
+## Branches
+The project is broken up into four parts, each part tackling a slightly different problem/task.
+- main: This is the unmodified rpi-kernel-4.9.80 with no changes.
+- project1: This is the basic project setup, getting acquainted with making minor changes like modifying the version name and recompiling the kernel.
+- project2: This is where we got aquainted with the concept of loadable kernel modules. We made system calls for a calculator app with modules that would "hack" the program, replacing all the functions with a modulo operator.
+- project3: Project3 is where we start to get into the fun stuff. We made a dummy task in the userspace with a calibration function so that it would still work off of the latencies of different CPUs, and implemented 3 kernel system calls for managing real time scheduling for real time tasks: set_rsv(), cancel_rsv(), and wait_until_next_period();
+- project4: Project4 is where I spent the majority of my time, a blogpost detailing my anguish can be found [here](https://cameron-lee.com/blog/real-time-linux-scheduler). In this final part, we modified part 3 to support partitioned earliest deadline first scheduling isntead of monotonic. We also added support for chain information and measuring end-to-end latency for tasks in chains.
